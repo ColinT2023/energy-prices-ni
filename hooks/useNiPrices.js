@@ -2,33 +2,30 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { londonDayStart } from "../lib/londonTime";
-
-const FULL_SEASON_START = "2026-01-01T00:00:00Z";
-const SCOPE_DAYS = { today: 1, "7day": 7 };
-
-function scopeStartDate(scope) {
-  const days = SCOPE_DAYS[scope];
-  if (!days) return FULL_SEASON_START; // 'full'
-  // "Today"/"7 day" are NI-local-day boundaries, not UTC ones — using UTC
-  // midnight here would put the window an hour off for half the year
-  // during BST.
-  return londonDayStart(days - 1).toISOString();
-}
 
 /**
- * Fetches ni_prices_banded rows for the given scope ('today' | '7day' |
- * 'full') and keeps them live via a Supabase realtime subscription.
+ * Fetches ni_prices_banded rows within `range` ({from, to}, `to` optional
+ * for an open-ended "through now" window — see lib/priceRange.js) and
+ * keeps them live via a Supabase realtime subscription. The range is
+ * always applied at the query level (.gte/.lt), never fetched in full and
+ * filtered client-side — ni_prices only grows over time, so an unscoped
+ * fetch would get slower every day regardless of what's on screen.
  *
- * Realtime events trigger a full re-fetch of the current scope rather than
- * patching the changed row in place. ni_prices_banded computes each row's
- * band from a trailing 7 day average, so a single new row can shift the
- * band of other already-loaded rows too — a single-row patch would leave
- * those stale on screen, so the whole window is re-pulled instead. That
- * also means reconnecting after a dropped connection needs no gap
+ * `range` must be a value the caller keeps referentially stable across
+ * renders unless its actual bounds changed (e.g. via useMemo) — it's a
+ * direct effect dependency. Pass `null` for "not ready to fetch yet"
+ * (e.g. a custom range with one date still unset); rows stay empty and no
+ * query is made.
+ *
+ * Realtime events trigger a full re-fetch of the current range rather
+ * than patching the changed row in place. ni_prices_banded computes each
+ * row's band from a trailing 7 day average, so a single new row can shift
+ * the band of other already-loaded rows too — a single-row patch would
+ * leave those stale on screen, so the whole window is re-pulled instead.
+ * That also means reconnecting after a dropped connection needs no gap
  * reconciliation: the next successful fetch is already complete.
  */
-export function useNiPrices(scope = "today") {
+export function useNiPrices(range) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -43,18 +40,28 @@ export function useNiPrices(scope = "today") {
       return;
     }
 
+    if (!range) {
+      setRows([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     // No setLoading(true) here: this is called directly from an effect
-    // body (both on mount and on scope change), and setting state
+    // body (both on mount and on range change), and setting state
     // synchronously before the first await in that path triggers React's
     // cascading-render warning. `loading` starts true for the initial
-    // mount and simply isn't reset for later scope changes — the old
-    // scope's rows stay on screen until the new ones arrive, which reads
+    // mount and simply isn't reset for later range changes — the old
+    // range's rows stay on screen until the new ones arrive, which reads
     // better than a flash back to a loading state anyway.
-    const { data, error: fetchError } = await supabase
+    let query = supabase
       .from("ni_prices_banded")
       .select("*")
-      .gte("datetime", scopeStartDate(scope))
+      .gte("datetime", range.from)
       .order("datetime", { ascending: true });
+    if (range.to) query = query.lt("datetime", range.to);
+
+    const { data, error: fetchError } = await query;
 
     if (fetchError) {
       setError(fetchError.message);
@@ -63,7 +70,7 @@ export function useNiPrices(scope = "today") {
       setError(null);
     }
     setLoading(false);
-  }, [scope]);
+  }, [range]);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +87,7 @@ export function useNiPrices(scope = "today") {
     function openChannel() {
       if (cancelled) return;
       const ch = supabase
-        .channel(`ni-prices-${scope}-${Date.now()}`)
+        .channel(`ni-prices-${Date.now()}`)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "ni_prices" },
@@ -124,7 +131,7 @@ export function useNiPrices(scope = "today") {
         channelRef.current = null;
       }
     };
-  }, [scope, fetchRows]);
+  }, [range, fetchRows]);
 
   return { rows, loading, error, refetch: fetchRows };
 }

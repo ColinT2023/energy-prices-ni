@@ -258,6 +258,42 @@ h1 {
   flex-wrap: wrap;
 }
 
+.custom-range {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.custom-range label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-range input[type="date"] {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+
+/* Native date-picker icon defaults to dark and disappears against the
+   dark input background without this. */
+.custom-range input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.custom-range-hint {
+  color: var(--peak);
+}
+
 .table-scroll {
   overflow-x: auto;
   border: 1px solid var(--line);
