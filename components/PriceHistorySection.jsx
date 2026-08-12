@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { presetRange, customRange, TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
+import { dayAheadSeries, latestIntradaySeries } from "../lib/priceSeries";
 import PriceHistoryChart from "./PriceHistoryChart";
 import PriceTable from "./PriceTable";
 
@@ -19,17 +20,36 @@ const VIEWS = [
   { key: "table", label: "Table" },
 ];
 
+const SERIES = [
+  { key: "dayAhead", label: "Day ahead" },
+  { key: "intraday", label: "Intraday" },
+  { key: "both", label: "Both" },
+];
+
+/** Rows for a given series selection — same logic the chart itself uses
+ * (dayAheadSeries/latestIntradaySeries), so an export filtered to one
+ * series matches exactly what that series means on the chart rather than
+ * a naive "all rows for that auction" filter. */
+function rowsForSeries(rows, seriesFilter) {
+  if (seriesFilter === "dayAhead") return dayAheadSeries(rows);
+  if (seriesFilter === "intraday") return latestIntradaySeries(rows);
+  return rows;
+}
+
 /**
- * Owns the Today/7 day/All time/Custom scope and the chart/table view
- * switch the brief describes as shared between the chart and the table,
- * resolves that scope to a single {from, to} range (lib/priceRange.js),
- * fetches it once via useNiPrices, and hands the rows to whichever view
- * is active — and, via the `rows` passed down, to the Excel export too,
- * so an export always matches exactly what's on screen.
+ * Owns the Today/7 day/All time/Custom scope, the chart/table view
+ * switch, and the Day ahead/Intraday/Both series toggle — resolves the
+ * scope to a single {from, to} range (lib/priceRange.js), fetches it once
+ * via useNiPrices, and hands the rows to whichever view is active. The
+ * series toggle only affects the chart and the export (same principle as
+ * the date scope: the export always matches what's currently shown) —
+ * the table is unaffected, it already lists every auction's row
+ * regardless of this toggle.
  */
 export default function PriceHistorySection() {
   const [scope, setScope] = useState("today");
   const [view, setView] = useState("chart");
+  const [seriesFilter, setSeriesFilter] = useState("both");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
 
@@ -45,7 +65,7 @@ export default function PriceHistorySection() {
     setExporting(true);
     try {
       const suffix = scope === "custom" ? `${customFrom}-to-${customTo}` : scope;
-      await exportToExcel({ rows, filenameSuffix: suffix });
+      await exportToExcel({ rows: rowsForSeries(rows, seriesFilter), filenameSuffix: suffix });
     } finally {
       setExporting(false);
     }
@@ -66,6 +86,19 @@ export default function PriceHistorySection() {
                 onClick={() => setView(v.key)}
               >
                 {v.label}
+              </button>
+            ))}
+          </div>
+          <div className="toggle" role="group" aria-label="Series">
+            {SERIES.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className={s.key === seriesFilter ? "active" : undefined}
+                aria-pressed={s.key === seriesFilter}
+                onClick={() => setSeriesFilter(s.key)}
+              >
+                {s.label}
               </button>
             ))}
           </div>
@@ -125,6 +158,7 @@ export default function PriceHistorySection() {
       {view === "chart" ? (
         <PriceHistoryChart
           rows={rows}
+          seriesFilter={seriesFilter}
           emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
         />
       ) : (

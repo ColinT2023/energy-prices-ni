@@ -104,13 +104,31 @@ function tooltipText(point) {
  * intraday line whose stroke gradient follows the real price shape (each
  * point contributes its own band colour as a gradient stop) rather than a
  * fixed decorative gradient, so colour keeps meaning exactly one thing —
- * price level — everywhere on the page. Scope (Today/7 day/All time) and
- * the chart/table toggle live in the parent PriceHistorySection; this
- * component just renders whatever rows it's given.
+ * price level — everywhere on the page. Scope (Today/7 day/All time), the
+ * chart/table toggle, and the series toggle (`seriesFilter`: "dayAhead" |
+ * "intraday" | "both") all live in the parent PriceHistorySection; this
+ * component just renders whatever rows it's given, for whichever
+ * series are selected.
  */
-export default function PriceHistoryChart({ rows, emptyMessage = "No data yet for this range." }) {
-  const dayAheadPoints = useMemo(() => toPoints(dayAheadSeries(rows)), [rows]);
-  const intradayPoints = useMemo(() => toPoints(latestIntradaySeries(rows)), [rows]);
+export default function PriceHistoryChart({
+  rows,
+  emptyMessage = "No data yet for this range.",
+  seriesFilter = "both",
+}) {
+  const showDayAhead = seriesFilter !== "intraday";
+  const showIntraday = seriesFilter !== "dayAhead";
+
+  // Hidden series contribute no points at all (not just an unrendered
+  // path) — hiding a line also removes its values from the tooltip and
+  // the axis scale, rather than just visually suppressing the stroke.
+  const dayAheadPoints = useMemo(
+    () => (showDayAhead ? toPoints(dayAheadSeries(rows)) : []),
+    [rows, showDayAhead]
+  );
+  const intradayPoints = useMemo(
+    () => (showIntraday ? toPoints(latestIntradaySeries(rows)) : []),
+    [rows, showIntraday]
+  );
   const scales = useMemo(
     () => buildScales([...dayAheadPoints, ...intradayPoints]),
     [dayAheadPoints, intradayPoints]
@@ -224,13 +242,17 @@ export default function PriceHistoryChart({ rows, emptyMessage = "No data yet fo
         </div>
       )}
       <div className="auction-key">
-        <span>
-          <span className="line-sample" /> Day ahead
-        </span>
-        <span>
-          <span className="line-sample" style={{ background: "linear-gradient(90deg,#0b7fc3,#faba05,#e72c7a)" }} />
-          Latest intraday, coloured by price
-        </span>
+        {showDayAhead && (
+          <span>
+            <span className="line-sample" /> Day ahead
+          </span>
+        )}
+        {showIntraday && (
+          <span>
+            <span className="line-sample" style={{ background: "linear-gradient(90deg,#0b7fc3,#faba05,#e72c7a)" }} />
+            Latest intraday, coloured by price
+          </span>
+        )}
       </div>
     </div>
   );
