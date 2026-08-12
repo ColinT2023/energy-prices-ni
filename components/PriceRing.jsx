@@ -104,7 +104,7 @@ export default function PriceRing({ rows }) {
   return (
     <div className={styles.ringCol}>
       <div className={styles.ringWrap}>
-        <svg viewBox="0 0 380 380" width="380" height="380">
+        <svg viewBox="0 0 380 380" width="100%" height="100%">
           {Array.from({ length: periods }, (_, i) => {
             const row = segmentsByIndex.get(i);
             const startAngle = (360 / periods) * i - 90 + GAP_DEG / 2;

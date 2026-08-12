@@ -3,14 +3,14 @@
   flex-direction: column;
   align-items: center;
   gap: 18px;
-  flex-shrink: 0;
+  width: 100%;
 }
 
 .ringWrap {
   position: relative;
-  width: 380px;
-  height: 380px;
-  flex-shrink: 0;
+  width: 100%;
+  max-width: 380px;
+  aspect-ratio: 1 / 1;
 }
 
 .ringWrap svg path {
@@ -23,7 +23,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
-  width: 170px;
+  width: 45%; /* scales with ringWrap, roughly the inner circle's diameter */
   pointer-events: none;
 }
 
@@ -36,6 +36,12 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
+}
+
+@media (max-width: 420px) {
+  .price {
+    font-size: 30px;
+  }
 }
 
 .priceDot {
