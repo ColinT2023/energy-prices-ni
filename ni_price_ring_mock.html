@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NI Energy Prices — Price Ring mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1C1C1E;
+    --bg-raised: #29292C;
+    --line: #3D3D40;
+    --text: #F2F2F0;
+    --text-muted: #9A9A9E;
+    --low: #0B7FC3;
+    --average: #FABA05;
+    --peak: #E72C7A;
+    --now-stroke: #F2F2F0;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    padding: 48px 24px 80px;
+  }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+  }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 8px;
+  }
+
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500;
+    font-size: 28px;
+    margin: 0 0 40px;
+    letter-spacing: -0.01em;
+  }
+
+  .hero {
+    display: flex;
+    align-items: center;
+    gap: 48px;
+    padding: 32px;
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    flex-wrap: wrap;
+  }
+
+  .ring-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    flex-shrink: 0;
+  }
+
+  .ring-wrap {
+    position: relative;
+    width: 380px;
+    height: 380px;
+    flex-shrink: 0;
+  }
+
+  .ring-centre {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    width: 170px;
+  }
+
+  .ring-centre .price {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 44px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .price-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .ring-centre .unit {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .ring-centre .period {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .hero-side {
+    flex: 1;
+    min-width: 220px;
+  }
+
+  .hero-side p {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 20px;
+    max-width: 34ch;
+  }
+
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+
+  .section {
+    margin-top: 40px;
+  }
+
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .section-head h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 12px;
+    margin: 0;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .toggle {
+    display: flex;
+    gap: 2px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+  }
+
+  .toggle button {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--text-muted);
+    padding: 6px 14px;
+    cursor: pointer;
+  }
+
+  .toggle button.active {
+    background: var(--bg-raised);
+    color: var(--text);
+    border-color: var(--text-muted);
+  }
+
+  .toggle button:first-child { border-radius: 3px 0 0 3px; }
+  .toggle button:last-child { border-radius: 0 3px 3px 0; border-left: none; }
+  .toggle button:not(:first-child):not(:last-child) { border-left: none; }
+
+  .chart-box {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 24px;
+    background: var(--bg-raised);
+  }
+
+  .auction-key {
+    display: flex;
+    gap: 20px;
+    margin-top: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .auction-key span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .line-sample {
+    width: 16px;
+    height: 2px;
+    background: var(--text);
+  }
+
+  .line-sample.dashed {
+    background: repeating-linear-gradient(90deg, var(--text-muted), var(--text-muted) 4px, transparent 4px, transparent 7px);
+  }
+
+  .footnote {
+    margin-top: 40px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pulse-segment {
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">NI Electricity · SEM Auctions</p>
+  <h1>Northern Ireland energy prices</h1>
+
+  <div class="hero">
+    <div class="ring-col">
+      <div class="ring-wrap">
+        <svg id="ring" viewBox="0 0 380 380" width="380" height="380"></svg>
+        <div class="ring-centre">
+          <div class="price"><span class="price-dot" id="priceDot"></span>18.3p</div>
+          <div class="unit">per kWh · day ahead</div>
+          <div class="period" id="periodLabel">13:00–13:30 · now</div>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:var(--low)"></span> Low</div>
+        <div class="legend-item"><span class="swatch" style="background:var(--average)"></span> Average</div>
+        <div class="legend-item"><span class="swatch" style="background:var(--peak)"></span> Peak</div>
+      </div>
+    </div>
+
+    <div class="hero-side">
+      <p>Each segment is one half hourly settlement period today. Colour shows how that period compares to the last 7 days, blue for cheaper than normal, gold for typical, magenta for higher than normal. The lit segment is the current period.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <h2>Price history</h2>
+      <div class="toggle">
+        <button class="active">Today</button>
+        <button>7 day</button>
+        <button>Full 2026</button>
+      </div>
+    </div>
+
+    <div class="chart-box">
+      <svg viewBox="0 0 800 200" width="100%" height="200" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="intradayGradient" x1="0" y1="0" x2="800" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#0B7FC3"/>
+            <stop offset="25%" stop-color="#FABA05"/>
+            <stop offset="45%" stop-color="#E72C7A"/>
+            <stop offset="65%" stop-color="#FABA05"/>
+            <stop offset="100%" stop-color="#0B7FC3"/>
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="50" x2="800" y2="50" stroke="#3D3D40" stroke-width="1"/>
+        <line x1="0" y1="100" x2="800" y2="100" stroke="#3D3D40" stroke-width="1"/>
+        <line x1="0" y1="150" x2="800" y2="150" stroke="#3D3D40" stroke-width="1"/>
+        <path d="M0,150 L80,130 L160,120 L240,110 L320,90 L400,60 L480,45 L560,55 L640,70 L720,100 L800,130"
+              fill="none" stroke="#F2F2F0" stroke-width="2"/>
+        <path d="M0,155 L80,140 L160,128 L240,118 L320,95 L400,65 L480,50 L560,60 L640,78 L720,108 L800,138"
+              fill="none" stroke="url(#intradayGradient)" stroke-width="2.5"/>
+      </svg>
+      <div class="auction-key">
+        <span><span class="line-sample"></span> Day ahead</span>
+        <span><span class="line-sample" style="background:linear-gradient(90deg,#0B7FC3,#FABA05,#E72C7A,#FABA05,#0B7FC3)"></span> Latest intraday, coloured by price</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    Data from SEMOpx EA-001 market results. Day ahead prices are published the afternoon before delivery and revised by intraday auctions closer to real time. Informational only, not a basis for switching or trading decisions.
+  </div>
+</div>
+
+<script>
+  const svg = document.getElementById('ring');
+  const ns = "http://www.w3.org/2000/svg";
+  const centreX = 190, centreY = 190, outerR = 130, innerR = 98;
+  const segments = 48;
+  const currentSegment = 26; // 13:00 period, for the mock
+
+  // Sample price band pattern across the day, roughly matching a typical
+  // NI day ahead shape: cheap overnight, evening peak.
+  const bands = [];
+  for (let i = 0; i < segments; i++) {
+    let band;
+    if (i < 12) band = 'low';         // overnight
+    else if (i < 32) band = 'average'; // daytime
+    else if (i < 40) band = 'peak';    // evening peak
+    else band = 'average';
+    bands.push(band);
+  }
+
+  const colours = { low: '#0B7FC3', average: '#FABA05', peak: '#E72C7A' };
+  const gapDeg = 1.4;
+
+  for (let i = 0; i < segments; i++) {
+    const startAngle = (360 / segments) * i - 90 + gapDeg / 2;
+    const endAngle = (360 / segments) * (i + 1) - 90 - gapDeg / 2;
+    const path = describeArc(centreX, centreY, outerR, innerR, startAngle, endAngle);
+    const el = document.createElementNS(ns, 'path');
+    el.setAttribute('d', path);
+    el.setAttribute('fill', colours[bands[i]]);
+    el.setAttribute('opacity', i === currentSegment ? '1' : '0.6');
+    if (i === currentSegment) {
+      el.setAttribute('class', 'pulse-segment');
+      el.setAttribute('stroke', '#F2F2F0');
+      el.setAttribute('stroke-width', '2');
+    }
+    svg.appendChild(el);
+  }
+
+  // Hour markers. Each hour spans exactly two half hourly segments, so the
+  // hour boundary sits precisely on the seam between segment (2h - 1) and
+  // segment 2h. That seam angle is what we tick and, at major hours, label.
+  const tickR1 = outerR + 5;
+  const tickR2minor = outerR + 10;
+  const tickR2major = outerR + 14;
+  const labelR = outerR + 30;
+  const majorHours = [0, 3, 6, 9, 12, 15, 18, 21];
+
+  for (let h = 0; h < 24; h++) {
+    const boundaryAngle = (360 / 24) * h - 90; // start-of-hour seam
+    const isMajor = majorHours.includes(h);
+
+    const p1 = polarToCartesian(centreX, centreY, tickR1, boundaryAngle);
+    const p2 = polarToCartesian(centreX, centreY, isMajor ? tickR2major : tickR2minor, boundaryAngle);
+    const tick = document.createElementNS(ns, 'line');
+    tick.setAttribute('x1', p1.x); tick.setAttribute('y1', p1.y);
+    tick.setAttribute('x2', p2.x); tick.setAttribute('y2', p2.y);
+    tick.setAttribute('stroke', isMajor ? '#9A9A9E' : '#4A4A4D');
+    tick.setAttribute('stroke-width', isMajor ? '1.4' : '1');
+    svg.appendChild(tick);
+
+    if (isMajor) {
+      const lp = polarToCartesian(centreX, centreY, labelR, boundaryAngle);
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', lp.x);
+      label.setAttribute('y', lp.y);
+      label.setAttribute('fill', '#9A9A9E');
+      label.setAttribute('font-family', 'IBM Plex Mono, monospace');
+      label.setAttribute('font-size', '11');
+      label.setAttribute('text-anchor',
+        Math.cos((boundaryAngle * Math.PI) / 180) > 0.3 ? 'start' :
+        Math.cos((boundaryAngle * Math.PI) / 180) < -0.3 ? 'end' : 'middle');
+      label.setAttribute('dominant-baseline',
+        Math.sin((boundaryAngle * Math.PI) / 180) > 0.3 ? 'hanging' :
+        Math.sin((boundaryAngle * Math.PI) / 180) < -0.3 ? 'auto' : 'middle');
+      label.textContent = String(h).padStart(2, '0') + ':00';
+      svg.appendChild(label);
+    }
+  }
+
+  function polarToCartesian(cx, cy, r, angleDeg) {
+    const a = (angleDeg * Math.PI) / 180;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+
+  function describeArc(cx, cy, rOuter, rInner, startAngle, endAngle) {
+    const p1 = polarToCartesian(cx, cy, rOuter, endAngle);
+    const p2 = polarToCartesian(cx, cy, rOuter, startAngle);
+    const p3 = polarToCartesian(cx, cy, rInner, startAngle);
+    const p4 = polarToCartesian(cx, cy, rInner, endAngle);
+    const largeArc = endAngle - startAngle <= 180 ? 0 : 1;
+    return [
+      `M ${p1.x} ${p1.y}`,
+      `A ${rOuter} ${rOuter} 0 ${largeArc} 0 ${p2.x} ${p2.y}`,
+      `L ${p3.x} ${p3.y}`,
+      `A ${rInner} ${rInner} 0 ${largeArc} 1 ${p4.x} ${p4.y}`,
+      'Z'
+    ].join(' ');
+  }
+
+  // "Now" marker: a filled dot with a soft pulsing halo, sitting in its own
+  // radius band outside the hour ticks. Deliberately a different visual
+  // language (dot + halo) from the hour ticks (thin static lines) so the
+  // two don't compete, and it points at the middle of the current segment
+  // rather than a tick boundary.
+  const nowAngle = (360 / segments) * (currentSegment + 0.5) - 90;
+  const nowPos = polarToCartesian(centreX, centreY, outerR + 20, nowAngle);
+
+  const halo = document.createElementNS(ns, 'circle');
+  halo.setAttribute('cx', nowPos.x);
+  halo.setAttribute('cy', nowPos.y);
+  halo.setAttribute('r', '8');
+  halo.setAttribute('fill', '#F2F2F0');
+  halo.setAttribute('opacity', '0.3');
+  halo.setAttribute('class', 'pulse-segment');
+  svg.appendChild(halo);
+
+  const dot = document.createElementNS(ns, 'circle');
+  dot.setAttribute('cx', nowPos.x);
+  dot.setAttribute('cy', nowPos.y);
+  dot.setAttribute('r', '3.5');
+  dot.setAttribute('fill', '#F2F2F0');
+  svg.appendChild(dot);
+
+  // Link the current price and "now" label to the same colour as the lit
+  // segment, so cause (that segment's band) and effect (the headline price)
+  // are visibly the same thing rather than two separate facts.
+  const currentColour = colours[bands[currentSegment]];
+  document.getElementById('priceDot').style.background = currentColour;
+  document.getElementById('periodLabel').style.color = currentColour;
+</script>
+</body>
+</html>
