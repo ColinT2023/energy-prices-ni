@@ -1,3 +1,5 @@
+import { BAND_EXPLANATION } from "../../lib/priceSeries";
+
 export const metadata = {
   title: "Help — NI Energy Prices",
   description: "How the SEM electricity market and its auctions work, and what the numbers on this site mean.",
@@ -60,6 +62,11 @@ const SECTIONS = [
         body: "SEMOpx publishes prices in both currencies, since the SEM spans two currency zones. This site shows GBP by default.",
       },
     ],
+  },
+  {
+    heading: "Low, average, and peak",
+    intro: BAND_EXPLANATION,
+    terms: [],
   },
 ];
 

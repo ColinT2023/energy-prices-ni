@@ -34,26 +34,36 @@ values (1, null)
 on conflict (id) do nothing;
 
 -- ── Rolling band view ────────────────────────────────────────────────────────
--- Low / average / peak relative to the trailing 7 day average, computed at
--- query time so it's always current rather than stored and going stale.
+-- Low / average / peak by rank against the trailing 7 days of prices, not a
+-- fixed percentage of their average: each row is compared to every
+-- half-hourly price_gbp in the preceding 7 days (same window as before),
+-- and banded by which third of that distribution it falls in — bottom
+-- third low, top third peak, middle third average. Computed at query time
+-- so it's always current rather than stored and going stale.
+--
+-- (Superseded the original ±15%-of-trailing-average threshold: that could
+-- put nearly every price in "average" on a low-volatility week and don't
+-- reliably carve out actual thirds the way a rank-based split does.
+-- trailing_7d_avg is kept alongside the new trailing_7d_p33/p67 cutoffs —
+-- nothing currently reads it, but it's harmless to leave for anyone
+-- querying the view directly.)
 create or replace view ni_prices_banded as
 select
   p.*,
-  avg(p.price_gbp) over (
-    order by p.datetime
-    range between interval '7 days' preceding and interval '1 second' preceding
-  ) as trailing_7d_avg,
+  avg(p.price_gbp) over w as trailing_7d_avg,
+  percentile_cont(0.33) within group (order by p.price_gbp) over w as trailing_7d_p33,
+  percentile_cont(0.67) within group (order by p.price_gbp) over w as trailing_7d_p67,
   case
-    when p.price_gbp < 0.85 * avg(p.price_gbp) over (
-      order by p.datetime range between interval '7 days' preceding and interval '1 second' preceding
-    ) then 'low'
-    when p.price_gbp > 1.15 * avg(p.price_gbp) over (
-      order by p.datetime range between interval '7 days' preceding and interval '1 second' preceding
-    ) then 'peak'
+    when p.price_gbp < percentile_cont(0.33) within group (order by p.price_gbp) over w then 'low'
+    when p.price_gbp > percentile_cont(0.67) within group (order by p.price_gbp) over w then 'peak'
     else 'average'
   end as band
 from ni_prices p
-where p.market like 'NI%';
+where p.market like 'NI%'
+window w as (
+  order by p.datetime
+  range between interval '7 days' preceding and interval '1 second' preceding
+);
 
 -- ── Row level security ──────────────────────────────────────────────────────
 -- Public read-only access for the anon key used by the frontend. Writes are

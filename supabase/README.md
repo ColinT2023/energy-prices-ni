@@ -16,9 +16,15 @@ contents of [`schema.sql`](./schema.sql), and run it. This creates:
 - `ingestion_state` — single-row watermark the ingestion workflow uses to
   know which reports it's already processed
 - `ni_prices_banded` — a view over `ni_prices` computing the low/average/peak
-  band at query time from the trailing 7-day average
+  band at query time by ranking each row against the trailing 7 days of
+  prices (bottom third low, top third peak, middle third average)
 - Row level security: public read access on `ni_prices` (and therefore the
   view), no public write access anywhere
+
+Since `create or replace view` is idempotent, re-running the whole file is
+always safe — including after pulling a schema.sql update like the switch
+from a fixed ±15%-of-average threshold to the rank-based bands above,
+which only touches the `ni_prices_banded` definition.
 
 ## 3. Collect credentials
 

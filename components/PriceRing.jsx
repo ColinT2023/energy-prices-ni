@@ -13,7 +13,7 @@ import {
   shiftYmd,
   periodsInLondonDay,
 } from "../lib/londonTime";
-import { latestPerPeriod, AUCTION_LABEL } from "../lib/priceSeries";
+import { latestPerPeriod, AUCTION_LABEL, BAND_EXPLANATION } from "../lib/priceSeries";
 import styles from "./PriceRing.module.css";
 
 // Segment count is *not* a fixed 48: the UK/Ireland clock change days have
@@ -135,6 +135,7 @@ export default function PriceRing() {
   const currentColour = current ? BAND_COLOUR[current.band] : "var(--text-muted)";
 
   const [activeIndex, setActiveIndex] = useState(null);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   function segmentTooltip(index, row) {
     const label = periodLabel(dayStart.getTime() + index * 30 * 60000);
@@ -358,6 +359,24 @@ export default function PriceRing() {
           <span className="swatch" style={{ background: "var(--peak)" }} />
           Peak
         </div>
+        <span className="legend-info-wrap">
+          <button
+            type="button"
+            className="info-button"
+            aria-label="How low, average, and peak are worked out"
+            onMouseEnter={() => setInfoOpen(true)}
+            onMouseLeave={() => setInfoOpen(false)}
+            onFocus={() => setInfoOpen(true)}
+            onBlur={() => setInfoOpen(false)}
+          >
+            i
+          </button>
+          {infoOpen && (
+            <span className="info-tooltip" role="tooltip">
+              {BAND_EXPLANATION}
+            </span>
+          )}
+        </span>
       </div>
     </div>
   );

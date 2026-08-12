@@ -2,11 +2,15 @@
 
 import PriceRing from "../components/PriceRing";
 import PriceHistorySection from "../components/PriceHistorySection";
+import DataAsOf from "../components/DataAsOf";
 
 export default function HomePage() {
   return (
     <div className="page-wrap">
-      <p className="eyebrow">NI Electricity · SEM Auctions</p>
+      <div className="eyebrow-row">
+        <p className="eyebrow">NI Electricity · SEM Auctions</p>
+        <DataAsOf />
+      </div>
       <h1>Northern Ireland energy prices</h1>
 
       <div className="hero">
