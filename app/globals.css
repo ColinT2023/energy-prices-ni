@@ -366,6 +366,11 @@ h1 {
   gap: 6px;
 }
 
+.chart-aggregation-note {
+  flex-basis: 100%;
+  font-style: italic;
+}
+
 .section-controls {
   display: flex;
   gap: 12px;

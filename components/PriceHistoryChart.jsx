@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { dayAheadSeries, latestIntradaySeries } from "../lib/priceSeries";
-import { formatLondonTime, formatLondonDateTime } from "../lib/londonTime";
+import { aggregateDaily, dayAheadSeries, latestIntradaySeries, WIDE_RANGE_DAYS } from "../lib/priceSeries";
+import { formatLondonTime, formatLondonDateTime, formatLongDate, londonYmd } from "../lib/londonTime";
 
 // SVG stop-color doesn't reliably resolve CSS custom properties across
 // renderers/exports, so the band hexes are duplicated here from the
@@ -92,10 +92,22 @@ function periodLabel(t) {
   return `${formatLondonDateTime(t)}–${formatLondonTime(t + 30 * 60000)}`;
 }
 
-function tooltipText(point) {
-  const parts = [periodLabel(point.t)];
-  if (point.dayAhead != null) parts.push(`day ahead ${point.dayAhead.toFixed(1)}p`);
-  if (point.intraday != null) parts.push(`intraday ${point.intraday.toFixed(1)}p`);
+/** "12 Aug 2026" for an aggregated daily point — a half-hourly range
+ * reads as false precision once a point actually represents a day's
+ * average. */
+function dayLabel(t) {
+  return formatLongDate(londonYmd(new Date(t)));
+}
+
+function pointLabel(t, isAggregated) {
+  return isAggregated ? dayLabel(t) : periodLabel(t);
+}
+
+function tooltipText(point, isAggregated) {
+  const parts = [pointLabel(point.t, isAggregated)];
+  const suffix = isAggregated ? " avg" : "";
+  if (point.dayAhead != null) parts.push(`day ahead ${point.dayAhead.toFixed(1)}p${suffix}`);
+  if (point.intraday != null) parts.push(`intraday ${point.intraday.toFixed(1)}p${suffix}`);
   return parts.join(" · ");
 }
 
@@ -118,17 +130,31 @@ export default function PriceHistoryChart({
   const showDayAhead = seriesFilter !== "intraday";
   const showIntraday = seriesFilter !== "dayAhead";
 
+  // Plotting every half-hourly row is the point for Today/7 day, but past
+  // WIDE_RANGE_DAYS it's mostly noise (and a real render cost at ~29k
+  // points for All time) — collapse to one point per day instead. Based
+  // on the actual span of what was fetched, not the scope label, so a
+  // wide Custom range gets the same treatment as All time.
+  const isAggregated = useMemo(() => {
+    if (rows.length < 2) return false;
+    const times = rows.map((r) => new Date(r.datetime).getTime());
+    const spanDays = (Math.max(...times) - Math.min(...times)) / (1000 * 60 * 60 * 24);
+    return spanDays > WIDE_RANGE_DAYS;
+  }, [rows]);
+
   // Hidden series contribute no points at all (not just an unrendered
   // path) — hiding a line also removes its values from the tooltip and
   // the axis scale, rather than just visually suppressing the stroke.
-  const dayAheadPoints = useMemo(
-    () => (showDayAhead ? toPoints(dayAheadSeries(rows)) : []),
-    [rows, showDayAhead]
-  );
-  const intradayPoints = useMemo(
-    () => (showIntraday ? toPoints(latestIntradaySeries(rows)) : []),
-    [rows, showIntraday]
-  );
+  const dayAheadPoints = useMemo(() => {
+    if (!showDayAhead) return [];
+    const series = dayAheadSeries(rows);
+    return toPoints(isAggregated ? aggregateDaily(series) : series);
+  }, [rows, showDayAhead, isAggregated]);
+  const intradayPoints = useMemo(() => {
+    if (!showIntraday) return [];
+    const series = latestIntradaySeries(rows);
+    return toPoints(isAggregated ? aggregateDaily(series) : series);
+  }, [rows, showIntraday, isAggregated]);
   const scales = useMemo(
     () => buildScales([...dayAheadPoints, ...intradayPoints]),
     [dayAheadPoints, intradayPoints]
@@ -194,7 +220,7 @@ export default function PriceHistoryChart({
                 height={VIEW_H}
                 fill="transparent"
                 tabIndex={0}
-                aria-label={tooltipText(zone)}
+                aria-label={tooltipText(zone, isAggregated)}
                 onMouseEnter={() => setActiveIndex(i)}
                 onMouseLeave={() => setActiveIndex((a) => (a === i ? null : a))}
                 onFocus={() => setActiveIndex(i)}
@@ -224,17 +250,17 @@ export default function PriceHistoryChart({
                 left: `clamp(130px, ${(scales.x(activePoint.t) / VIEW_W) * 100}%, calc(100% - 110px))`,
               }}
             >
-              <div className="chart-tooltip-period">{periodLabel(activePoint.t)}</div>
+              <div className="chart-tooltip-period">{pointLabel(activePoint.t, isAggregated)}</div>
               {activePoint.dayAhead != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--text)" }} />
-                  Day ahead {activePoint.dayAhead.toFixed(1)}p
+                  Day ahead {activePoint.dayAhead.toFixed(1)}p{isAggregated ? " avg" : ""}
                 </div>
               )}
               {activePoint.intraday != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--average)" }} />
-                  Intraday {activePoint.intraday.toFixed(1)}p
+                  Intraday {activePoint.intraday.toFixed(1)}p{isAggregated ? " avg" : ""}
                 </div>
               )}
             </div>
@@ -253,6 +279,7 @@ export default function PriceHistoryChart({
             Latest intraday, coloured by price
           </span>
         )}
+        {isAggregated && <span className="chart-aggregation-note">Showing daily averages — select Today or 7 day for half-hourly detail.</span>}
       </div>
     </div>
   );
