@@ -31,6 +31,28 @@ RESOURCE_BASE = "https://reports.semopx.com/documents/"
 # that fix) — this endpoint is a plausible future source for a live
 # "is today's auction delayed?" indicator on the site, but nothing here
 # reads it today.
+#
+# Separately, also found and worth keeping on record: semopx.com's own
+# "Market Results" chart widget does not read the flat CSV this pipeline
+# downloads (RESOURCE_BASE + ResourceName). It reads a different,
+# undocumented endpoint keyed by the report's internal _id instead of its
+# filename — https://reports.sem-o.com/api/v1/documents/{_id}?IST=1 (the
+# _id comes from the static-reports listing above). That endpoint returns
+# the report's fully parsed contents as JSON (an already-decoded
+# equivalent of what parse_market_result_report extracts from the raw
+# CSV), and — confirmed directly — can have real values populated there
+# while RESOURCE_BASE + ResourceName for the exact same report still
+# 404s/returns a placeholder and the response's own
+# "FilePublicationDelayed" field is true. So this endpoint runs ahead of
+# the official CSV, not just a mirror of it.
+#
+# Deliberately not integrated: it's unofficial and undocumented (no
+# indication it's a stable public API rather than an implementation
+# detail of the website's own frontend), and switching to it would mean
+# tracking reports by _id instead of ResourceName and parsing a different
+# response shape. Kept here as a reference in case the CSV endpoint's lag
+# becomes a recurring problem worth revisiting, not an active
+# integration.
 
 # Earliest date either script will ever ask the API for. Used as the
 # backfill start date and as the incremental script's fallback when no
