@@ -85,7 +85,7 @@ function buildHitZones(tooltipPoints, scales) {
 }
 
 // Date on the start time only ("12 Aug 13:30–14:00") — the scope can span
-// many days (7 day/Full 2026/Custom), so a bare time range like the
+// many days (7 day/All time/Custom), so a bare time range like the
 // Ring's (always a single day, disambiguated by its own date picker) is
 // ambiguous here.
 function periodLabel(t) {
@@ -104,7 +104,7 @@ function tooltipText(point) {
  * intraday line whose stroke gradient follows the real price shape (each
  * point contributes its own band colour as a gradient stop) rather than a
  * fixed decorative gradient, so colour keeps meaning exactly one thing —
- * price level — everywhere on the page. Scope (Today/7 day/Full 2026) and
+ * price level — everywhere on the page. Scope (Today/7 day/All time) and
  * the chart/table toggle live in the parent PriceHistorySection; this
  * component just renders whatever rows it's given.
  */

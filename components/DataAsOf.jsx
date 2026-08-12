@@ -5,10 +5,19 @@ import { supabase } from "../lib/supabase";
 import { formatLondonFullDateTime } from "../lib/londonTime";
 
 /**
- * "Data as of <latest inserted_at>", kept live via its own realtime
- * subscription on ni_prices — deliberately independent of the Ring/chart's
- * own subscriptions rather than threaded through useNiPrices, since this
- * only ever needs a single MAX(inserted_at) value, not a scoped row set.
+ * "Prices available through <latest settlement period>", kept live via
+ * its own realtime subscription on ni_prices — deliberately independent
+ * of the Ring/chart's own subscriptions rather than threaded through
+ * useNiPrices, since this only ever needs a single MAX(datetime) value,
+ * not a scoped row set.
+ *
+ * Reads max(datetime) — the latest settlement period actually covered by
+ * the data — not max(inserted_at), which is when a row was written to
+ * the table. Those can diverge a lot: right after a backfill,
+ * inserted_at is "just now" for every row regardless of how old the
+ * priced periods are, which read as "data as of today" sitting directly
+ * above an empty today-only Ring — technically accurate, but backwards
+ * from what actually explains the empty ring to a visitor.
  */
 export default function DataAsOf() {
   const [latest, setLatest] = useState(null);
@@ -20,10 +29,10 @@ export default function DataAsOf() {
     async function fetchLatest() {
       const { data } = await supabase
         .from("ni_prices")
-        .select("inserted_at")
-        .order("inserted_at", { ascending: false })
+        .select("datetime")
+        .order("datetime", { ascending: false })
         .limit(1);
-      if (!cancelled && data && data[0]) setLatest(data[0].inserted_at);
+      if (!cancelled && data && data[0]) setLatest(data[0].datetime);
     }
 
     fetchLatest();
@@ -47,5 +56,5 @@ export default function DataAsOf() {
 
   if (!latest) return null;
 
-  return <p className="eyebrow">Data as of {formatLondonFullDateTime(latest)}</p>;
+  return <p className="eyebrow">Prices available through {formatLondonFullDateTime(latest)}</p>;
 }

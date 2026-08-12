@@ -10,7 +10,7 @@ import PriceTable from "./PriceTable";
 const SCOPES = [
   { key: "today", label: "Today" },
   { key: "7day", label: "7 day" },
-  { key: "full", label: "Full 2026" },
+  { key: "full", label: "All time" },
   { key: "custom", label: "Custom" },
 ];
 
@@ -20,7 +20,7 @@ const VIEWS = [
 ];
 
 /**
- * Owns the Today/7 day/Full 2026/Custom scope and the chart/table view
+ * Owns the Today/7 day/All time/Custom scope and the chart/table view
  * switch the brief describes as shared between the chart and the table,
  * resolves that scope to a single {from, to} range (lib/priceRange.js),
  * fetches it once via useNiPrices, and hands the rows to whichever view
