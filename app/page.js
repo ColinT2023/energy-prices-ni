@@ -2,6 +2,7 @@
 
 import { useNiPrices } from "../hooks/useNiPrices";
 import PriceRing from "../components/PriceRing";
+import PriceHistorySection from "../components/PriceHistorySection";
 
 export default function HomePage() {
   const { rows, loading, error } = useNiPrices("today");
@@ -25,9 +26,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <p className="placeholder-note">
-        Price history chart and table view land here in the next pass.
-      </p>
+      <PriceHistorySection />
     </div>
   );
 }
