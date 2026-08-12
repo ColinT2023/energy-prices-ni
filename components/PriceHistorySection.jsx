@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
-import { presetRange, customRange } from "../lib/priceRange";
+import { presetRange, customRange, TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
 import PriceHistoryChart from "./PriceHistoryChart";
 import PriceTable from "./PriceTable";
@@ -122,7 +122,14 @@ export default function PriceHistorySection() {
       )}
 
       {error && <p role="alert">Couldn&apos;t load price history: {error}</p>}
-      {view === "chart" ? <PriceHistoryChart rows={rows} /> : <PriceTable rows={rows} />}
+      {view === "chart" ? (
+        <PriceHistoryChart
+          rows={rows}
+          emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
+        />
+      ) : (
+        <PriceTable rows={rows} />
+      )}
     </div>
   );
 }

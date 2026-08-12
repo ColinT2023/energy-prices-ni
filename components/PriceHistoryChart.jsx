@@ -55,7 +55,7 @@ function toPath(points, scales) {
  * the chart/table toggle live in the parent PriceHistorySection; this
  * component just renders whatever rows it's given.
  */
-export default function PriceHistoryChart({ rows }) {
+export default function PriceHistoryChart({ rows, emptyMessage = "No data yet for this range." }) {
   const dayAheadPoints = useMemo(() => toPoints(dayAheadSeries(rows)), [rows]);
   const intradayPoints = useMemo(() => toPoints(latestIntradaySeries(rows)), [rows]);
   const scales = useMemo(
@@ -66,7 +66,7 @@ export default function PriceHistoryChart({ rows }) {
   return (
     <div className="chart-box">
       {!scales ? (
-        <p className="placeholder-note">No data yet for this range.</p>
+        <p className="placeholder-note">{emptyMessage}</p>
       ) : (
         <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} width="100%" height="200" preserveAspectRatio="none">
           <defs>

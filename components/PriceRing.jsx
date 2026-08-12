@@ -8,6 +8,7 @@ import {
   periodsInLondonDay,
 } from "../lib/londonTime";
 import { latestPerPeriod, AUCTION_LABEL } from "../lib/priceSeries";
+import { TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import styles from "./PriceRing.module.css";
 
 // Segment count is *not* a fixed 48: the UK/Ireland clock change days have
@@ -99,6 +100,22 @@ export default function PriceRing({ rows }) {
     const label = periodLabel(dayStart.getTime() + index * 30 * 60000);
     if (!row) return `${label} · not yet published`;
     return `${label} · ${gbpToPence(row.price_gbp).toFixed(1)}p · ${row.band}`;
+  }
+
+  // Normal for part of the day — day-ahead publishes the afternoon
+  // before delivery, not at midnight — so this is a "check back later"
+  // state, not an error. Shown in place of the whole ring rather than a
+  // ring full of silent grey "not yet published" segments.
+  if (segmentsByIndex.size === 0) {
+    return (
+      <div className={styles.ringCol}>
+        <div className={styles.ringWrap}>
+          <div className={styles.emptyState}>
+            <p>{TODAY_NOT_PUBLISHED_MESSAGE}</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
