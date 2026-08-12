@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { presetRange, customRange } from "../lib/priceRange";
+import { exportToExcel } from "../lib/exportExcel";
 import PriceHistoryChart from "./PriceHistoryChart";
 import PriceTable from "./PriceTable";
 
@@ -38,6 +39,17 @@ export default function PriceHistorySection() {
   }, [scope, customFrom, customTo]);
 
   const { rows, error } = useNiPrices(range);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const suffix = scope === "custom" ? `${customFrom}-to-${customTo}` : scope;
+      await exportToExcel({ rows, filenameSuffix: suffix });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div className="section">
@@ -70,6 +82,14 @@ export default function PriceHistorySection() {
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            className="export-button"
+            onClick={handleExport}
+            disabled={exporting || rows.length === 0}
+          >
+            {exporting ? "Exporting…" : "Export .xlsx"}
+          </button>
         </div>
       </div>
 

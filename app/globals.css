@@ -256,6 +256,28 @@ h1 {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.export-button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.export-button:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.export-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .custom-range {
