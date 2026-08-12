@@ -96,6 +96,12 @@ where p.market like 'NI%';
 -- granted to anon/authenticated here.
 alter table ni_prices enable row level security;
 
+-- Unlike the tables above (if not exists) and the view (create or
+-- replace), CREATE POLICY has no built-in "if not exists" — rerunning
+-- this file a second time without the drop first fails with "policy
+-- already exists" for this line specifically.
+drop policy if exists "Public read access" on ni_prices;
+
 create policy "Public read access"
   on ni_prices
   for select

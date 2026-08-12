@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { dayAheadSeries, latestIntradaySeries } from "../lib/priceSeries";
-import { formatLondonTime } from "../lib/londonTime";
+import { formatLondonTime, formatLondonDateTime } from "../lib/londonTime";
 
 // SVG stop-color doesn't reliably resolve CSS custom properties across
 // renderers/exports, so the band hexes are duplicated here from the
@@ -84,8 +84,12 @@ function buildHitZones(tooltipPoints, scales) {
   });
 }
 
+// Date on the start time only ("12 Aug 13:30–14:00") — the scope can span
+// many days (7 day/Full 2026/Custom), so a bare time range like the
+// Ring's (always a single day, disambiguated by its own date picker) is
+// ambiguous here.
 function periodLabel(t) {
-  return `${formatLondonTime(t)}–${formatLondonTime(t + 30 * 60000)}`;
+  return `${formatLondonDateTime(t)}–${formatLondonTime(t + 30 * 60000)}`;
 }
 
 function tooltipText(point) {
