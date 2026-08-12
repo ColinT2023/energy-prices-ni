@@ -86,8 +86,17 @@ export function useNiPrices(range) {
 
     function openChannel() {
       if (cancelled) return;
+      // Date.now() alone can collide within the same millisecond when
+      // React StrictMode double-invokes this effect in dev (mount ->
+      // cleanup -> mount, synchronously) — if removeChannel() from the
+      // cleanup hasn't fully unregistered the old channel by the time the
+      // second mount calls supabase.channel() with the same name,
+      // supabase-js can hand back the *same* already-subscribed channel
+      // object, and calling .on() on it then throws "cannot add
+      // postgres_changes callbacks ... after subscribe()". The random
+      // suffix makes that name collision impossible.
       const ch = supabase
-        .channel(`ni-prices-${Date.now()}`)
+        .channel(`ni-prices-${Date.now()}-${Math.random().toString(36).slice(2)}`)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "ni_prices" },

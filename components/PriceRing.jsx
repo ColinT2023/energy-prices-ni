@@ -1,20 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../lib/supabase";
+import { useNiPrices } from "../hooks/useNiPrices";
+import { dayRange, TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import {
-  londonDayStart,
+  londonMidnightUtc,
+  londonYmd,
   settlementPeriodIndex,
   formatLondonTime,
+  formatLongDate,
+  shiftYmd,
   periodsInLondonDay,
 } from "../lib/londonTime";
 import { latestPerPeriod, AUCTION_LABEL } from "../lib/priceSeries";
-import { TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import styles from "./PriceRing.module.css";
 
 // Segment count is *not* a fixed 48: the UK/Ireland clock change days have
 // 46 (spring forward, 01:00-02:00 skipped) or 50 (clocks back,
 // 01:00-02:00 repeats) — see periodsInLondonDay. Every angle below is
-// computed from the actual period count for today rather than assuming 48.
+// computed from the actual period count for the selected day rather than
+// assuming 48.
 const GAP_DEG = 1.4;
 const MAJOR_HOUR_LABELS = new Set(["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"]);
 const CENTRE = 190;
@@ -57,16 +63,48 @@ function gbpToPence(priceGbp) {
   return priceGbp / 10;
 }
 
-/** Renders the Price Ring for "today" — pass it rows from useNiPrices('today'). */
-export default function PriceRing({ rows }) {
+/**
+ * Price Ring for a single day — defaults to today, with previous/next day
+ * arrows and a date picker to browse any earlier day back to the first
+ * one with data. Owns its own data fetch (day-scoped, not the open-ended
+ * "today onward" the rest of the page uses) so this stays self-contained.
+ */
+export default function PriceRing() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
+  const todayYmd = useMemo(() => londonYmd(now), [now]);
 
-  const dayStart = useMemo(() => londonDayStart(0, now), [now]);
-  const periods = useMemo(() => periodsInLondonDay(now), [now]);
+  const [selectedDate, setSelectedDate] = useState(() => londonYmd(new Date()));
+  const isToday = selectedDate === todayYmd;
+
+  // Earliest navigable day — fetched once, not hardcoded, so this tracks
+  // wherever the backfill/ingestion actually starts rather than an
+  // assumed season-start date.
+  const [earliestDate, setEarliestDate] = useState(null);
+  useEffect(() => {
+    if (!supabase) return;
+    let cancelled = false;
+    supabase
+      .from("ni_prices")
+      .select("datetime")
+      .order("datetime", { ascending: true })
+      .limit(1)
+      .then(({ data }) => {
+        if (!cancelled && data && data[0]) setEarliestDate(londonYmd(new Date(data[0].datetime)));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const range = useMemo(() => dayRange(selectedDate), [selectedDate]);
+  const { rows, loading, error } = useNiPrices(range);
+
+  const dayStart = useMemo(() => londonMidnightUtc(new Date(selectedDate)), [selectedDate]);
+  const periods = useMemo(() => periodsInLondonDay(new Date(selectedDate)), [selectedDate]);
 
   const segmentsByIndex = useMemo(() => {
     const byIndex = new Map();
@@ -80,7 +118,7 @@ export default function PriceRing({ rows }) {
   // Major-hour label -> segment index lookup, walking only even indices
   // (every segment that starts a new local hour). Built from the actual
   // per-segment wall-clock label rather than a fixed 2-segments-per-hour
-  // formula, since that formula only holds before any clock change today.
+  // formula, since that formula only holds before any clock change that day.
   const majorHourIndex = useMemo(() => {
     const map = new Map();
     for (let i = 0; i < periods; i += 2) {
@@ -90,28 +128,89 @@ export default function PriceRing({ rows }) {
     return map;
   }, [dayStart, periods]);
 
-  const currentIndex = Math.min(settlementPeriodIndex(now, dayStart), periods - 1);
-  const current = segmentsByIndex.get(currentIndex);
+  // "Now" only means anything on today's ring — a past day has no live
+  // period, so there's nothing to highlight or pulse.
+  const currentIndex = isToday ? Math.min(settlementPeriodIndex(now, dayStart), periods - 1) : null;
+  const current = currentIndex != null ? segmentsByIndex.get(currentIndex) : undefined;
   const currentColour = current ? BAND_COLOUR[current.band] : "var(--text-muted)";
 
   const [activeIndex, setActiveIndex] = useState(null);
 
   function segmentTooltip(index, row) {
     const label = periodLabel(dayStart.getTime() + index * 30 * 60000);
-    if (!row) return `${label} · not yet published`;
+    if (!row) return `${label} · no data`;
     return `${label} · ${gbpToPence(row.price_gbp).toFixed(1)}p · ${row.band}`;
   }
 
-  // Normal for part of the day — day-ahead publishes the afternoon
-  // before delivery, not at midnight — so this is a "check back later"
-  // state, not an error. Shown in place of the whole ring rather than a
-  // ring full of silent grey "not yet published" segments.
-  if (segmentsByIndex.size === 0) {
+  const canGoPrevious = !earliestDate || selectedDate > earliestDate;
+  const canGoNext = selectedDate < todayYmd;
+
+  function goToPreviousDay() {
+    const prev = shiftYmd(selectedDate, -1);
+    if (!earliestDate || prev >= earliestDate) setSelectedDate(prev);
+  }
+  function goToNextDay() {
+    const next = shiftYmd(selectedDate, 1);
+    if (next <= todayYmd) setSelectedDate(next);
+  }
+
+  const dayNav = (
+    <div className={styles.dayNav}>
+      <button
+        type="button"
+        className={styles.dayNavButton}
+        onClick={goToPreviousDay}
+        disabled={!canGoPrevious}
+        aria-label="Previous day"
+      >
+        ‹
+      </button>
+      <input
+        type="date"
+        className={styles.dayNavInput}
+        value={selectedDate}
+        min={earliestDate || undefined}
+        max={todayYmd}
+        onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+        aria-label="Select day"
+      />
+      <button
+        type="button"
+        className={styles.dayNavButton}
+        onClick={goToNextDay}
+        disabled={!canGoNext}
+        aria-label="Next day"
+      >
+        ›
+      </button>
+    </div>
+  );
+
+  if (error) {
     return (
       <div className={styles.ringCol}>
+        {dayNav}
         <div className={styles.ringWrap}>
           <div className={styles.emptyState}>
-            <p>{TODAY_NOT_PUBLISHED_MESSAGE}</p>
+            <p role="alert">Couldn&apos;t load prices: {error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal for part of today specifically — day-ahead publishes the
+  // afternoon before delivery, not at midnight — so that's a "check back
+  // later" state, not an error. A past day with nothing recorded is a
+  // genuine gap, worded differently. Either way this replaces the whole
+  // ring rather than leaving 48 silent grey "no data" segments.
+  if (!loading && segmentsByIndex.size === 0) {
+    return (
+      <div className={styles.ringCol}>
+        {dayNav}
+        <div className={styles.ringWrap}>
+          <div className={styles.emptyState}>
+            <p>{isToday ? TODAY_NOT_PUBLISHED_MESSAGE : `No prices recorded for ${formatLongDate(selectedDate)}.`}</p>
           </div>
         </div>
       </div>
@@ -120,6 +219,7 @@ export default function PriceRing({ rows }) {
 
   return (
     <div className={styles.ringCol}>
+      {dayNav}
       <div className={styles.ringWrap}>
         <svg viewBox="0 0 380 380" width="100%" height="100%">
           {Array.from({ length: periods }, (_, i) => {
@@ -187,36 +287,47 @@ export default function PriceRing({ rows }) {
             );
           })}
 
-          {(() => {
-            const nowAngle = (360 / periods) * (currentIndex + 0.5) - 90;
-            const nowPos = polarToCartesian(CENTRE, CENTRE, OUTER_R + 20, nowAngle);
-            return (
-              <>
-                <circle
-                  cx={nowPos.x}
-                  cy={nowPos.y}
-                  r="8"
-                  fill="var(--now-stroke)"
-                  opacity="0.3"
-                  className="pulse-segment"
-                />
-                <circle cx={nowPos.x} cy={nowPos.y} r="3.5" fill="var(--now-stroke)" />
-              </>
-            );
-          })()}
+          {currentIndex != null &&
+            (() => {
+              const nowAngle = (360 / periods) * (currentIndex + 0.5) - 90;
+              const nowPos = polarToCartesian(CENTRE, CENTRE, OUTER_R + 20, nowAngle);
+              return (
+                <>
+                  <circle
+                    cx={nowPos.x}
+                    cy={nowPos.y}
+                    r="8"
+                    fill="var(--now-stroke)"
+                    opacity="0.3"
+                    className="pulse-segment"
+                  />
+                  <circle cx={nowPos.x} cy={nowPos.y} r="3.5" fill="var(--now-stroke)" />
+                </>
+              );
+            })()}
         </svg>
 
         <div className={styles.ringCentre}>
           <div className={styles.price}>
-            <span className={styles.priceDot} style={{ background: currentColour }} />
-            {current ? `${gbpToPence(current.price_gbp).toFixed(1)}p` : "—"}
+            {isToday ? (
+              <>
+                <span className={styles.priceDot} style={{ background: currentColour }} />
+                {current ? `${gbpToPence(current.price_gbp).toFixed(1)}p` : "—"}
+              </>
+            ) : (
+              formatLongDate(selectedDate)
+            )}
           </div>
-          <div className={styles.unit}>
-            per kWh{current ? ` · ${AUCTION_LABEL[current.auction] ?? current.auction}` : ""}
-          </div>
-          <div className={styles.period} style={{ color: currentColour }}>
-            {periodLabel(dayStart.getTime() + currentIndex * 30 * 60000)} · now
-          </div>
+          {isToday && (
+            <>
+              <div className={styles.unit}>
+                per kWh{current ? ` · ${AUCTION_LABEL[current.auction] ?? current.auction}` : ""}
+              </div>
+              <div className={styles.period} style={{ color: currentColour }}>
+                {periodLabel(dayStart.getTime() + currentIndex * 30 * 60000)} · now
+              </div>
+            </>
+          )}
         </div>
 
         {activeIndex != null && (
