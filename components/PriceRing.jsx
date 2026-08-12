@@ -100,6 +100,33 @@ export default function PriceRing() {
     };
   }, []);
 
+  // Latest date actually present in ni_prices — day ahead auctions publish
+  // in the afternoon for the *next* day's delivery, so by evening this can
+  // genuinely be ahead of todayYmd. The nav ceiling below tracks whichever
+  // is later, so tomorrow becomes reachable the moment its data exists
+  // rather than being blocked by a hardcoded "today".
+  const [latestDataDate, setLatestDataDate] = useState(null);
+  useEffect(() => {
+    if (!supabase) return;
+    let cancelled = false;
+    supabase
+      .from("ni_prices")
+      .select("datetime")
+      .order("datetime", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (!cancelled && data && data[0]) setLatestDataDate(londonYmd(new Date(data[0].datetime)));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Navigation ceiling — today by default, but never earlier than the
+  // actual latest date with data, so this only ever moves forward past
+  // today, never restricts below it (e.g. while ingestion is behind).
+  const navUpperBound = latestDataDate && latestDataDate > todayYmd ? latestDataDate : todayYmd;
+
   const range = useMemo(() => dayRange(selectedDate), [selectedDate]);
   const { rows, loading, error } = useNiPrices(range);
 
@@ -144,7 +171,7 @@ export default function PriceRing() {
   }
 
   const canGoPrevious = !earliestDate || selectedDate > earliestDate;
-  const canGoNext = selectedDate < todayYmd;
+  const canGoNext = selectedDate < navUpperBound;
 
   function goToPreviousDay() {
     const prev = shiftYmd(selectedDate, -1);
@@ -152,7 +179,7 @@ export default function PriceRing() {
   }
   function goToNextDay() {
     const next = shiftYmd(selectedDate, 1);
-    if (next <= todayYmd) setSelectedDate(next);
+    if (next <= navUpperBound) setSelectedDate(next);
   }
 
   const dayNav = (
@@ -171,7 +198,7 @@ export default function PriceRing() {
         className={styles.dayNavInput}
         value={selectedDate}
         min={earliestDate || undefined}
-        max={todayYmd}
+        max={navUpperBound}
         onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
         aria-label="Select day"
       />
