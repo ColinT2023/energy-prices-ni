@@ -19,6 +19,19 @@ import requests
 API_URL = "https://reports.semopx.com/api/v1/documents/static-reports"
 RESOURCE_BASE = "https://reports.semopx.com/documents/"
 
+# Not used by this pipeline, but worth keeping on record: semopx.com's own
+# "Auction Status" widget (homepage, under "Our Markets") is backed by a
+# separate, undocumented endpoint — https://reports.sem-o.com/api/v1/ommessages
+# (also reachable at the reports.semopx.com host; both resolve to the same
+# data). It returns live per-market status records, e.g.:
+#   {"Market": "SEM-DA", "MarketStatus": "On Time",
+#    "OrderBookClosure": "On Time", "MarketResultsPublication": "Final", ...}
+# Found via a real-browser network capture while investigating why the
+# EA-001 report list appeared stuck (see get_new_ea001_reports below for
+# that fix) — this endpoint is a plausible future source for a live
+# "is today's auction delayed?" indicator on the site, but nothing here
+# reads it today.
+
 # Earliest date either script will ever ask the API for. Used as the
 # backfill start date and as the incremental script's fallback when no
 # watermark has been set yet.
@@ -29,6 +42,11 @@ def get_ea001_report_list(start_date, sort_by="Date", order_by="ASC", page_size=
     """
     Page through the SEMOpx report list for every EA-001 report published
     on or after start_date, returning the full list of report items.
+
+    Always passes ExcludeDelayedPublication=0 (see get_new_ea001_reports'
+    docstring for why) — without it, the API silently drops the most
+    recently published reports regardless of the Date range asked for,
+    which is exactly what left ni_prices stuck at "yesterday" every run.
     """
     items = []
     page = 1
@@ -36,6 +54,7 @@ def get_ea001_report_list(start_date, sort_by="Date", order_by="ASC", page_size=
         params = {
             "DPuG_ID": "EA-001",
             "Date": f">={start_date}",
+            "ExcludeDelayedPublication": 0,
             "page": page,
             "page_size": page_size,
             "sort_by": sort_by,
@@ -52,6 +71,71 @@ def get_ea001_report_list(start_date, sort_by="Date", order_by="ASC", page_size=
             break
         page += 1
 
+    return items
+
+
+def get_new_ea001_reports(watermark, page_size=100):
+    """
+    Page through the EA-001 report list newest-first (sort_by=PublishTime,
+    order_by=DESC), stopping as soon as a report's PublishTime reaches the
+    given watermark — so this only ever looks back as far as needed to
+    reach already-ingested data, not the full (1,000+ and growing) report
+    history the way a Date-bounded fetch would.
+
+    No Date filter here at all, deliberately: SEMOpx's Date filter — even
+    combined with ExcludeDelayedPublication=0 — was found to still cap
+    results at whatever the API's "recent" cutoff is when both are
+    combined with a Date lower bound close to now, which is what caused
+    ni_prices to get permanently stuck (the incremental script's own
+    watermark landed exactly on that boundary, so every run's Date-bounded
+    query returned nothing newer, forever). Sorting the *unfiltered* list
+    by PublishTime with ExcludeDelayedPublication=0 and stopping client-
+    side once the watermark is reached avoids that entirely, verified
+    directly against the live API.
+
+    watermark=None (no prior state) means every report is "new" — this
+    pages through the whole history, same cost as a one-off backfill, but
+    that only happens once, before any watermark exists.
+
+    Returns items oldest-to-newest (ascending PublishTime), so a caller
+    can still take items[-1]["PublishTime"] as the new watermark.
+    """
+    watermark_ts = parse_publish_time(watermark) if watermark else None
+    items = []
+    page = 1
+    while True:
+        params = {
+            "DPuG_ID": "EA-001",
+            "ExcludeDelayedPublication": 0,
+            "page": page,
+            "page_size": page_size,
+            "sort_by": "PublishTime",
+            "order_by": "DESC",
+        }
+        response = requests.get(API_URL, params=params, timeout=30)
+        response.raise_for_status()
+        payload = response.json()
+
+        page_items = payload.get("items", [])
+        if not page_items:
+            break
+
+        reached_watermark = False
+        for item in page_items:
+            if watermark_ts is not None and parse_publish_time(item["PublishTime"]) <= watermark_ts:
+                reached_watermark = True
+                break
+            items.append(item)
+
+        if reached_watermark:
+            break
+
+        total_pages = payload.get("pagination", {}).get("totalPages", 1)
+        if page >= total_pages:
+            break
+        page += 1
+
+    items.reverse()  # was newest-first; callers want oldest-first
     return items
 
 
@@ -116,6 +200,18 @@ def download_and_parse_reports(report_items, pause_seconds=0.2):
     instead of build_ni_price_table.py's print-and-continue, so a caller
     can decide whether it's safe to advance an ingestion watermark past a
     batch that had failures in it.
+
+    A report can appear in the list (especially with
+    ExcludeDelayedPublication=0, see get_new_ea001_reports) before its
+    actual file is ready: the document URL then returns HTTP 200 with a
+    body like {"errorMessage":"","code":0} instead of the CSV report —
+    confirmed against several live "just published" reports that stayed
+    in this state for minutes after listing. That's indistinguishable
+    from "genuinely empty report" to parse_market_result_report (it just
+    finds no matching blocks and returns []), so it's checked for
+    explicitly here and treated as a failure rather than silently parsed
+    as zero records — otherwise the caller would advance its watermark
+    past a report that was never actually ingested, losing it for good.
     """
     records = []
     failures = []
@@ -124,6 +220,8 @@ def download_and_parse_reports(report_items, pause_seconds=0.2):
         try:
             response = requests.get(RESOURCE_BASE + resource_name, timeout=30)
             response.raise_for_status()
+            if not response.text.lstrip().startswith("Auction;"):
+                raise ValueError(f"report not yet available (got {response.text[:100]!r} instead of CSV)")
             records.extend(parse_market_result_report(response.text, resource_name))
         except Exception as error:
             failures.append((resource_name, str(error)))

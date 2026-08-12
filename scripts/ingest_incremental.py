@@ -20,10 +20,8 @@ from dotenv import load_dotenv
 from supabase import create_client
 
 from ni_prices_common import (
-    DEFAULT_START_DATE,
     download_and_parse_reports,
-    get_ea001_report_list,
-    parse_publish_time,
+    get_new_ea001_reports,
     pivot_records,
     price_table_to_rows,
 )
@@ -36,16 +34,7 @@ def main():
     state = supabase.table("ingestion_state").select("last_publish_time").eq("id", 1).single().execute()
     watermark = state.data["last_publish_time"]
 
-    # The API's Date filter is date-only, so this is a coarse pre-filter —
-    # precise PublishTime filtering happens below in Python.
-    query_start_date = watermark[:10] if watermark else DEFAULT_START_DATE
-    all_items = get_ea001_report_list(query_start_date, sort_by="PublishTime", order_by="ASC")
-
-    watermark_ts = parse_publish_time(watermark) if watermark else None
-    new_items = [
-        item for item in all_items
-        if watermark_ts is None or parse_publish_time(item["PublishTime"]) > watermark_ts
-    ]
+    new_items = get_new_ea001_reports(watermark)
 
     if not new_items:
         print(f"No new EA-001 reports since watermark {watermark or '(none)'}.")
