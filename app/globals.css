@@ -372,3 +372,55 @@ h1 {
   height: 2px;
   background: var(--text);
 }
+
+.glossary-lede {
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: 68ch;
+  margin: 0 0 40px;
+}
+
+.glossary-section {
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+
+.glossary-section h2 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 500;
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+
+.glossary-section > .glossary-body {
+  max-width: 68ch;
+  margin: 0 0 20px;
+}
+
+dl {
+  margin: 0;
+}
+
+.glossary-entry {
+  margin-bottom: 20px;
+}
+
+.glossary-entry dt,
+.glossary-entry dd {
+  margin: 0;
+}
+
+.glossary-term {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.glossary-body {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 68ch;
+  margin: 0;
+}
