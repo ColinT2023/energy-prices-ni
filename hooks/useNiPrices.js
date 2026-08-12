@@ -3,6 +3,57 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+// PostgREST (Supabase's REST layer) caps a single request at 1,000 rows by
+// default, silently — no error, no truncation flag, just fewer rows than
+// actually match. "All time" (and any Custom range spanning more than
+// ~7-8 days at this app's ~132 rows/day) exceeds that in one request, so
+// every caller of this hook pages through until a page comes back short,
+// rather than trusting a single request to be complete.
+//
+// Pagination is by keyset (datetime, market), not OFFSET (.range()) —
+// confirmed directly against the live database that OFFSET fails once it
+// gets a few pages deep: ni_prices_banded computes a trailing-7-day
+// aggregate per row via a LATERAL join, and OFFSET makes Postgres run that
+// for every skipped row before applying the limit, not just the ones
+// actually returned. Past ~12,000 skipped rows this exceeded the
+// statement timeout (PostgREST error 57014) and the request failed
+// outright — worse than the 1,000-row cap it would've replaced. Filtering
+// by "datetime, market) > last-seen" instead lets Postgres seek straight
+// to the next page via the existing datetime index, so it only ever pays
+// the LATERAL cost for rows actually returned. (datetime, market) is used
+// as the cursor, not datetime alone, because ni_prices' unique constraint
+// is on that pair — several rows can share one datetime (one per
+// auction), and datetime alone as a cursor could silently skip whichever
+// of those rows didn't make it into a page.
+const PAGE_SIZE = 1000;
+
+async function fetchAllRows(range) {
+  const rows = [];
+  let cursor = null; // { datetime, market } of the last row from the previous page
+  for (;;) {
+    let query = supabase
+      .from("ni_prices_banded")
+      .select("*")
+      .gte("datetime", range.from)
+      .order("datetime", { ascending: true })
+      .order("market", { ascending: true })
+      .limit(PAGE_SIZE);
+    if (range.to) query = query.lt("datetime", range.to);
+    if (cursor) {
+      query = query.or(`datetime.gt.${cursor.datetime},and(datetime.eq.${cursor.datetime},market.gt.${cursor.market})`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) break;
+    const last = data[data.length - 1];
+    cursor = { datetime: last.datetime, market: last.market };
+  }
+  return rows;
+}
+
 /**
  * Fetches ni_prices_banded rows within `range` ({from, to}, `to` optional
  * for an open-ended "through now" window — see lib/priceRange.js) and
@@ -54,20 +105,12 @@ export function useNiPrices(range) {
     // mount and simply isn't reset for later range changes — the old
     // range's rows stay on screen until the new ones arrive, which reads
     // better than a flash back to a loading state anyway.
-    let query = supabase
-      .from("ni_prices_banded")
-      .select("*")
-      .gte("datetime", range.from)
-      .order("datetime", { ascending: true });
-    if (range.to) query = query.lt("datetime", range.to);
-
-    const { data, error: fetchError } = await query;
-
-    if (fetchError) {
-      setError(fetchError.message);
-    } else {
-      setRows(data ?? []);
+    try {
+      const data = await fetchAllRows(range);
+      setRows(data);
       setError(null);
+    } catch (fetchError) {
+      setError(fetchError.message);
     }
     setLoading(false);
   }, [range]);
