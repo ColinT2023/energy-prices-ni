@@ -83,6 +83,11 @@ export function useNiPrices(range) {
 
   const channelRef = useRef(null);
   const reconnectTimerRef = useRef(null);
+  // { inFlight, pending } for the *current* range — reassigned to a fresh
+  // object whenever range changes (in the effect below), so a still-
+  // running fetch from a range that's since changed operates on its own
+  // orphaned object and can't affect the new range's tracking.
+  const flightRef = useRef({ inFlight: false, pending: false });
 
   const fetchRows = useCallback(async () => {
     if (!supabase) {
@@ -97,6 +102,24 @@ export function useNiPrices(range) {
       setLoading(false);
       return;
     }
+
+    // Several things can ask for a fresh fetch in quick succession: the
+    // realtime channel's own "catch up once subscribed" call landing
+    // right after the initial mount fetch, a postgres_changes event
+    // arriving mid-fetch, a tab regaining visibility. Each is a reason to
+    // be *current*, not a reason to run a whole separate fetch — a second
+    // concurrent All-time pass alone doubled this hook's network cost
+    // (30 pages became ~59 requests). If a fetch is already running, this
+    // call is recorded as pending instead of starting its own; the
+    // in-flight fetch runs once more right after it finishes, so whatever
+    // the pending call was reacting to still gets picked up — coalesced
+    // into one trailing fetch rather than dropped or run in parallel.
+    const flight = flightRef.current;
+    if (flight.inFlight) {
+      flight.pending = true;
+      return;
+    }
+    flight.inFlight = true;
 
     // No setLoading(true) here: this is called directly from an effect
     // body (both on mount and on range change), and setting state
@@ -113,10 +136,21 @@ export function useNiPrices(range) {
       setError(fetchError.message);
     }
     setLoading(false);
+
+    flight.inFlight = false;
+    if (flight.pending) {
+      flight.pending = false;
+      fetchRows();
+    }
   }, [range]);
 
   useEffect(() => {
     let cancelled = false;
+    // Whether the channel has completed at least one SUBSCRIBED before —
+    // gates the catch-up fetch below (see openChannel) so it only fires
+    // on a genuine *re*connect, not the very first connect.
+    let hasConnectedBefore = false;
+    flightRef.current = { inFlight: false, pending: false };
 
     // fetchRows's setState calls all happen after its first `await`, so
     // this isn't a synchronous setState during render — but the static
@@ -151,7 +185,18 @@ export function useNiPrices(range) {
           if (cancelled) return;
           if (status === "SUBSCRIBED") {
             clearTimeout(reconnectTimerRef.current);
-            fetchRows(); // catch up on anything missed while (re)connecting
+            // Only fetch here on a *re*connect. The very first SUBSCRIBED
+            // fires milliseconds after the effect's own direct fetchRows()
+            // call above, for the same range — there's no gap for
+            // anything to have gone missing yet, so re-fetching here too
+            // was pure duplicate work (confirmed live: it doubled All
+            // time's ~11s load to ~22s, run sequentially thanks to the
+            // in-flight coalescing above, or ~59 concurrent requests
+            // without it). A real reconnect after a dropped connection is
+            // exactly when something could genuinely have been missed,
+            // so the catch-up still runs then.
+            if (hasConnectedBefore) fetchRows();
+            hasConnectedBefore = true;
           } else {
             clearTimeout(reconnectTimerRef.current);
             reconnectTimerRef.current = setTimeout(() => {
