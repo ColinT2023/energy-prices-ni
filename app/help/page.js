@@ -26,19 +26,19 @@ const SECTIONS = [
   {
     heading: "The auctions",
     intro:
-      "Electricity has to be bought and sold in advance because it can't be stored at scale, someone has to commit to generating exactly what everyone else is about to use, half hour by half hour. That commitment happens through a sequence of auctions, each one closer to real time and each one refining the price using better information.",
+      "Electricity has to be bought and sold in advance because it can't be stored at scale, someone has to commit to generating exactly what everyone else is about to use, half hour by half hour. That commitment happens through a sequence of auctions, each one closer to real time and each one refining the price using better information. This is what the Auction column on this site shows: SEM-DA for the day ahead auction, then SEM-IDA1, SEM-IDA2, and SEM-IDA3 for the three intraday auctions that follow it, in order, a higher number always means a more recent revision.",
     terms: [
       {
         term: "Settlement period",
         body: "The half hour block that every price on this site refers to, for example 13:00 to 13:30. There are 48 settlement periods in a normal day.",
       },
       {
-        term: "Day ahead auction (DA)",
+        term: "Day ahead auction (SEM-DA)",
         body: "The main auction, held the afternoon before, that sets a price for every half hour of the following day. This is the price most people mean when they talk about “tomorrow's electricity price”, it's known well in advance, which is what makes things like time of use tariffs possible.",
       },
       {
-        term: "Intraday auctions (IDA1, IDA2, IDA3)",
-        body: "Three further auctions held on the day itself, each one repricing the remaining periods of that day using more up to date information, most importantly, a better picture of how much wind is actually blowing. Because Northern Ireland gets a large share of its power from wind, these auctions often move noticeably from the day ahead price.",
+        term: "Intraday auctions (SEM-IDA1, SEM-IDA2, SEM-IDA3)",
+        body: "Three further auctions held on the day itself, each one repricing the remaining periods of that day using more up to date information, most importantly, a better picture of how much wind is actually blowing. SEM-IDA1 is the first revision, SEM-IDA2 the second, SEM-IDA3 the third and closest to real time — a period won't necessarily have all three, but where it does, the highest-numbered one is the most current. Because Northern Ireland gets a large share of its power from wind, these auctions often move noticeably from the day ahead price.",
       },
       {
         term: "Index price",

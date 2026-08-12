@@ -162,7 +162,7 @@ export default function PriceHistorySection() {
           emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
         />
       ) : (
-        <PriceTable rows={rows} />
+        <PriceTable rows={rowsForSeries(rows, seriesFilter)} />
       )}
     </div>
   );
