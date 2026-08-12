@@ -424,3 +424,42 @@ dl {
   max-width: 68ch;
   margin: 0;
 }
+
+.site-footer {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 24px 48px;
+}
+
+.footnote {
+  margin-top: 40px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  max-width: 68ch;
+}
+
+/* A credit line, not a call to action — same quiet treatment as the
+   disclaimer above it, not competing for attention. */
+.attribution {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.linkedin-link {
+  display: inline-flex;
+  color: var(--text-muted);
+  line-height: 0;
+}
+
+.linkedin-link:hover {
+  color: var(--text);
+}

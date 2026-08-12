@@ -1,5 +1,6 @@
 import { Space_Grotesk, Inter, IBM_Plex_Mono } from "next/font/google";
 import Link from "next/link";
+import SiteFooter from "../components/SiteFooter";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -43,6 +44,7 @@ export default function RootLayout({ children }) {
           </nav>
         </header>
         <main>{children}</main>
+        <SiteFooter />
       </body>
     </html>
   );
