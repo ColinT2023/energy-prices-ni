@@ -236,6 +236,60 @@ h1 {
   background: var(--bg-raised);
 }
 
+.chart-plot {
+  position: relative;
+}
+
+.chart-plot svg rect {
+  cursor: default;
+}
+
+.chart-y-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.chart-y-label {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  background: var(--bg-raised);
+  padding: 0 6px 0 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.chart-tooltip-period {
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.chart-tooltip-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
 .auction-key {
   display: flex;
   gap: 20px;
