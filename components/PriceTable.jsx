@@ -8,7 +8,16 @@ const BAND_LABEL = { low: "Low", average: "Average", peak: "Peak" };
 const BAND_COLOUR = { low: "var(--low)", average: "var(--average)", peak: "var(--peak)" };
 
 const COLUMNS = [
-  { key: "datetime", label: "Settlement period" },
+  {
+    key: "datetime",
+    label: "Settlement period",
+    // Easy to misread as "when the auction ran" — it's the delivery
+    // period the price applies to, priced by an auction that ran earlier
+    // (the afternoon before, for day ahead; earlier the same day, for
+    // intraday). Native title attribute keeps this discoverable on hover
+    // without needing a new tooltip component for one column.
+    title: "The delivery period this price applies to, not when the auction that set it ran.",
+  },
   { key: "auction", label: "Auction" },
   { key: "pence", label: "Price (p/kWh)" },
   { key: "price_gbp", label: "Price (£/MWh)" },
@@ -66,6 +75,7 @@ export default function PriceTable({ rows }) {
               <th
                 key={col.key}
                 aria-sort={sortKey === col.key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+                title={col.title}
               >
                 <button type="button" className="sort-button" onClick={() => toggleSort(col.key)}>
                   {col.label}

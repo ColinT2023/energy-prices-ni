@@ -30,7 +30,7 @@ const SECTIONS = [
     terms: [
       {
         term: "Settlement period",
-        body: "The half hour block that every price on this site refers to, for example 13:00 to 13:30. There are 48 settlement periods in a normal day.",
+        body: "The half hour block that every price on this site refers to, for example 13:00 to 13:30. There are 48 settlement periods in a normal day. This is the delivery time the price applies to, not when the auction that set it ran — a day ahead price for 13:00 tomorrow was set by an auction that ran this afternoon, not at 13:00 itself.",
       },
       {
         term: "Day ahead auction (SEM-DA)",
