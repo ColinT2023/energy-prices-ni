@@ -1,13 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { londonDayStart, settlementPeriodIndex, formatLondonTime } from "../lib/londonTime";
+import {
+  londonDayStart,
+  settlementPeriodIndex,
+  formatLondonTime,
+  periodsInLondonDay,
+} from "../lib/londonTime";
 import { latestPerPeriod, AUCTION_LABEL } from "../lib/priceSeries";
 import styles from "./PriceRing.module.css";
 
-const SEGMENTS = 48;
+// Segment count is *not* a fixed 48: the UK/Ireland clock change days have
+// 46 (spring forward, 01:00-02:00 skipped) or 50 (clocks back,
+// 01:00-02:00 repeats) — see periodsInLondonDay. Every angle below is
+// computed from the actual period count for today rather than assuming 48.
 const GAP_DEG = 1.4;
-const MAJOR_HOURS = [0, 3, 6, 9, 12, 15, 18, 21];
+const MAJOR_HOUR_LABELS = new Set(["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"]);
 const CENTRE = 190;
 const OUTER_R = 130;
 const INNER_R = 98;
@@ -57,17 +65,31 @@ export default function PriceRing({ rows }) {
   }, []);
 
   const dayStart = useMemo(() => londonDayStart(0, now), [now]);
+  const periods = useMemo(() => periodsInLondonDay(now), [now]);
 
   const segmentsByIndex = useMemo(() => {
     const byIndex = new Map();
     for (const row of latestPerPeriod(rows)) {
       const idx = settlementPeriodIndex(row.datetime, dayStart);
-      if (idx >= 0 && idx < SEGMENTS) byIndex.set(idx, row);
+      if (idx >= 0 && idx < periods) byIndex.set(idx, row);
     }
     return byIndex;
-  }, [rows, dayStart]);
+  }, [rows, dayStart, periods]);
 
-  const currentIndex = settlementPeriodIndex(now, dayStart);
+  // Major-hour label -> segment index lookup, walking only even indices
+  // (every segment that starts a new local hour). Built from the actual
+  // per-segment wall-clock label rather than a fixed 2-segments-per-hour
+  // formula, since that formula only holds before any clock change today.
+  const majorHourIndex = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < periods; i += 2) {
+      const label = formatLondonTime(dayStart.getTime() + i * 30 * 60000);
+      if (MAJOR_HOUR_LABELS.has(label)) map.set(label, i);
+    }
+    return map;
+  }, [dayStart, periods]);
+
+  const currentIndex = Math.min(settlementPeriodIndex(now, dayStart), periods - 1);
   const current = segmentsByIndex.get(currentIndex);
   const currentColour = current ? BAND_COLOUR[current.band] : "var(--text-muted)";
 
@@ -83,10 +105,10 @@ export default function PriceRing({ rows }) {
     <div className={styles.ringCol}>
       <div className={styles.ringWrap}>
         <svg viewBox="0 0 380 380" width="380" height="380">
-          {Array.from({ length: SEGMENTS }, (_, i) => {
+          {Array.from({ length: periods }, (_, i) => {
             const row = segmentsByIndex.get(i);
-            const startAngle = (360 / SEGMENTS) * i - 90 + GAP_DEG / 2;
-            const endAngle = (360 / SEGMENTS) * (i + 1) - 90 - GAP_DEG / 2;
+            const startAngle = (360 / periods) * i - 90 + GAP_DEG / 2;
+            const endAngle = (360 / periods) * (i + 1) - 90 - GAP_DEG / 2;
             const d = describeArc(CENTRE, CENTRE, OUTER_R, INNER_R, startAngle, endAngle);
             const isCurrent = i === currentIndex;
             return (
@@ -108,14 +130,15 @@ export default function PriceRing({ rows }) {
             );
           })}
 
-          {Array.from({ length: 24 }, (_, h) => {
-            const boundaryAngle = (360 / 24) * h - 90;
-            const isMajor = MAJOR_HOURS.includes(h);
+          {Array.from({ length: periods / 2 }, (_, hourIdx) => {
+            const i = hourIdx * 2; // segment index where this local hour starts
+            const boundaryAngle = (360 / periods) * i - 90;
+            const isMajor = MAJOR_HOUR_LABELS.has(formatLondonTime(dayStart.getTime() + i * 30 * 60000));
             const p1 = polarToCartesian(CENTRE, CENTRE, OUTER_R + 5, boundaryAngle);
             const p2 = polarToCartesian(CENTRE, CENTRE, isMajor ? OUTER_R + 14 : OUTER_R + 10, boundaryAngle);
             return (
               <line
-                key={h}
+                key={i}
                 x1={p1.x}
                 y1={p1.y}
                 x2={p2.x}
@@ -126,14 +149,14 @@ export default function PriceRing({ rows }) {
             );
           })}
 
-          {MAJOR_HOURS.map((h) => {
-            const boundaryAngle = (360 / 24) * h - 90;
+          {[...majorHourIndex.entries()].map(([label, i]) => {
+            const boundaryAngle = (360 / periods) * i - 90;
             const lp = polarToCartesian(CENTRE, CENTRE, OUTER_R + 30, boundaryAngle);
             const cos = Math.cos((boundaryAngle * Math.PI) / 180);
             const sin = Math.sin((boundaryAngle * Math.PI) / 180);
             return (
               <text
-                key={h}
+                key={label}
                 x={lp.x}
                 y={lp.y}
                 fill="var(--text-muted)"
@@ -142,13 +165,13 @@ export default function PriceRing({ rows }) {
                 textAnchor={cos > 0.3 ? "start" : cos < -0.3 ? "end" : "middle"}
                 dominantBaseline={sin > 0.3 ? "hanging" : sin < -0.3 ? "auto" : "middle"}
               >
-                {String(h).padStart(2, "0")}:00
+                {label}
               </text>
             );
           })}
 
           {(() => {
-            const nowAngle = (360 / SEGMENTS) * (currentIndex + 0.5) - 90;
+            const nowAngle = (360 / periods) * (currentIndex + 0.5) - 90;
             const nowPos = polarToCartesian(CENTRE, CENTRE, OUTER_R + 20, nowAngle);
             return (
               <>
@@ -184,7 +207,7 @@ export default function PriceRing({ rows }) {
             className={styles.tooltip}
             role="tooltip"
             style={(() => {
-              const midAngle = (360 / SEGMENTS) * (activeIndex + 0.5) - 90;
+              const midAngle = (360 / periods) * (activeIndex + 0.5) - 90;
               const pos = polarToCartesian(CENTRE, CENTRE, OUTER_R + 46, midAngle);
               return { left: `${(pos.x / 380) * 100}%`, top: `${(pos.y / 380) * 100}%` };
             })()}
