@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { londonDayStart } from "../lib/londonTime";
 
 const FULL_SEASON_START = "2026-01-01T00:00:00Z";
 const SCOPE_DAYS = { today: 1, "7day": 7 };
@@ -9,10 +10,10 @@ const SCOPE_DAYS = { today: 1, "7day": 7 };
 function scopeStartDate(scope) {
   const days = SCOPE_DAYS[scope];
   if (!days) return FULL_SEASON_START; // 'full'
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  start.setUTCDate(start.getUTCDate() - (days - 1));
-  return start.toISOString();
+  // "Today"/"7 day" are NI-local-day boundaries, not UTC ones — using UTC
+  // midnight here would put the window an hour off for half the year
+  // during BST.
+  return londonDayStart(days - 1).toISOString();
 }
 
 /**
@@ -36,6 +37,12 @@ export function useNiPrices(scope = "today") {
   const reconnectTimerRef = useRef(null);
 
   const fetchRows = useCallback(async () => {
+    if (!supabase) {
+      setError("Supabase isn't configured — add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.");
+      setLoading(false);
+      return;
+    }
+
     // No setLoading(true) here: this is called directly from an effect
     // body (both on mount and on scope change), and setting state
     // synchronously before the first await in that path triggers React's
@@ -67,6 +74,8 @@ export function useNiPrices(scope = "today") {
     // flow and can't tell the difference, hence the disable below.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRows();
+
+    if (!supabase) return; // nothing to subscribe to without a configured client
 
     function openChannel() {
       if (cancelled) return;
