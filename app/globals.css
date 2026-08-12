@@ -1,0 +1,128 @@
+:root {
+  --bg: #1c1c1e;
+  --bg-raised: #29292c;
+  --line: #3d3d40;
+  --text: #f2f2f0;
+  --text-muted: #9a9a9e;
+  --low: #0b7fc3;
+  --average: #faba05;
+  --peak: #e72c7a;
+  --now-stroke: #f2f2f0;
+}
+
+/* --font-display / --font-body / --font-mono are set on <html> by
+   next/font (see app/layout.js) to the actual generated font family
+   names — referenced here as font-family: var(--font-display), sans-serif
+   rather than redeclared, since redeclaring them in :root would shadow
+   next/font's values with a circular reference. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+/* Every interactive element gets a visible keyboard focus ring — colour
+   bands are never the only way information is conveyed on this site, and
+   focus visibility follows the same principle for navigation. */
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.site-header {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.site-title {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.site-nav {
+  display: flex;
+  gap: 20px;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.site-nav a {
+  text-decoration: none;
+  color: var(--text-muted);
+}
+
+.site-nav a:hover {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pulse-segment {
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.page-wrap {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 24px 80px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+h1 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 500;
+  font-size: 28px;
+  margin: 0 0 24px;
+  letter-spacing: -0.01em;
+}
+
+.placeholder-note {
+  color: var(--text-muted);
+  font-size: 14px;
+}
