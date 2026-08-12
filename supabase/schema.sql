@@ -54,17 +54,28 @@ on conflict (id) do nothing;
 -- and failed against the live database. LATERAL is the correct shape: for
 -- each row in ni_prices, cross join to a subquery that computes avg/p33/p67
 -- as plain aggregates over just the rows in its trailing 7-day window.
+--
+-- trailing_7d_p33/p67 are appended *after* band rather than between
+-- trailing_7d_avg and band: CREATE OR REPLACE VIEW can only add columns at
+-- the very end, never reorder or insert among existing ones — Postgres
+-- reads a mid-list insertion as renaming whichever existing column moved,
+-- which is exactly what broke a previous version of this file ("cannot
+-- change name of view column band to trailing_7d_p33"). Keeping the
+-- original trailing_7d_avg/band positions fixed and only ever appending
+-- from here on avoids hitting that again, and — unlike dropping and
+-- recreating the view — leaves the grants below untouched, since replacing
+-- a view in place preserves its existing ACL while dropping it would not.
 create or replace view ni_prices_banded as
 select
   p.*,
   stats.trailing_7d_avg,
-  stats.trailing_7d_p33,
-  stats.trailing_7d_p67,
   case
     when p.price_gbp < stats.trailing_7d_p33 then 'low'
     when p.price_gbp > stats.trailing_7d_p67 then 'peak'
     else 'average'
-  end as band
+  end as band,
+  stats.trailing_7d_p33,
+  stats.trailing_7d_p67
 from ni_prices p
 cross join lateral (
   select
