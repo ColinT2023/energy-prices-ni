@@ -34,6 +34,21 @@ const CENTRE = 190;
 const OUTER_R = 130;
 const INNER_R = 98;
 
+// Radial layout for everything outside the segment ring (ticks, the
+// now-marker, hour labels) — all in the same viewBox units as OUTER_R, so
+// they scale together with it at any container size. TICK_R2_MAJOR was
+// previously the now-marker halo's near edge, which put the halo's own
+// edge *inside* the major ticks' reach (a real overlap, not just a visual
+// impression of one) — these are spaced so each ring has a clear gap
+// before the next: ticks end, then a gap, then the marker halo, then
+// another gap, then the label.
+const TICK_R1 = OUTER_R + 5;
+const TICK_R2_MINOR = OUTER_R + 10;
+const TICK_R2_MAJOR = OUTER_R + 14;
+const NOW_MARKER_R = OUTER_R + 26;
+const NOW_MARKER_HALO_R = 7;
+const HOUR_LABEL_R = OUTER_R + 39;
+
 const BAND_COLOUR = {
   low: "var(--low)",
   average: "var(--average)",
@@ -362,8 +377,8 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
             const i = hourIdx * 2; // segment index where this local hour starts
             const boundaryAngle = (360 / periods) * i - 90;
             const isMajor = MAJOR_HOUR_LABELS.has(formatLondonTime(dayStart.getTime() + i * 30 * 60000));
-            const p1 = polarToCartesian(CENTRE, CENTRE, OUTER_R + 5, boundaryAngle);
-            const p2 = polarToCartesian(CENTRE, CENTRE, isMajor ? OUTER_R + 14 : OUTER_R + 10, boundaryAngle);
+            const p1 = polarToCartesian(CENTRE, CENTRE, TICK_R1, boundaryAngle);
+            const p2 = polarToCartesian(CENTRE, CENTRE, isMajor ? TICK_R2_MAJOR : TICK_R2_MINOR, boundaryAngle);
             return (
               <line
                 key={i}
@@ -379,7 +394,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
 
           {[...majorHourIndex.entries()].map(([label, i]) => {
             const boundaryAngle = (360 / periods) * i - 90;
-            const lp = polarToCartesian(CENTRE, CENTRE, OUTER_R + 30, boundaryAngle);
+            const lp = polarToCartesian(CENTRE, CENTRE, HOUR_LABEL_R, boundaryAngle);
             const cos = Math.cos((boundaryAngle * Math.PI) / 180);
             const sin = Math.sin((boundaryAngle * Math.PI) / 180);
             return (
@@ -401,13 +416,13 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
           {currentIndex != null &&
             (() => {
               const nowAngle = (360 / periods) * (currentIndex + 0.5) - 90;
-              const nowPos = polarToCartesian(CENTRE, CENTRE, OUTER_R + 20, nowAngle);
+              const nowPos = polarToCartesian(CENTRE, CENTRE, NOW_MARKER_R, nowAngle);
               return (
                 <>
                   <circle
                     cx={nowPos.x}
                     cy={nowPos.y}
-                    r="8"
+                    r={NOW_MARKER_HALO_R}
                     fill="var(--now-stroke)"
                     opacity="0.3"
                     className="pulse-segment"

@@ -68,6 +68,13 @@
   cursor: default;
 }
 
+/* Hour label text can extend a little past the nominal viewBox edge
+   (its anchor point is inside the box, but the rendered glyphs aren't) —
+   without this the SVG's default overflow:hidden would clip it. */
+.ringWrap svg {
+  overflow: visible;
+}
+
 .emptyState {
   width: 100%;
   height: 100%;
