@@ -13,9 +13,74 @@ ingest_provisional.py for the kill switch and failure handling this
 unofficial dependency needs that the official pipeline doesn't.
 """
 
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
 import requests
 
 IST_DOCUMENT_URL = "https://reports.sem-o.com/api/v1/documents/{doc_id}?IST=1"
+LONDON_TZ = ZoneInfo("Europe/London")
+
+
+def london_today_bounds(now_utc=None):
+    """
+    (day_start_utc, day_end_utc, expected_periods) for "today" in
+    Europe/London. expected_periods comes from actual elapsed time between
+    local midnights, not assumed to be 48, so this stays correct on the
+    two UK clock-change days (46 in spring, 50 in autumn) — same idea as
+    lib/londonTime.js's periodsInLondonDay on the frontend, reimplemented
+    here since the ingestion scripts don't share code with the Next.js app.
+    """
+    now_utc = now_utc or datetime.now(timezone.utc)
+    now_london = now_utc.astimezone(LONDON_TZ)
+    today_midnight_local = now_london.replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow_midnight_local = (today_midnight_local + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    day_start_utc = today_midnight_local.astimezone(timezone.utc)
+    day_end_utc = tomorrow_midnight_local.astimezone(timezone.utc)
+    expected_periods = round((day_end_utc - day_start_utc).total_seconds() / 1800)
+    return day_start_utc, day_end_utc, expected_periods
+
+
+def today_fully_covered(supabase):
+    """
+    True if every settlement period of today (London) already has at
+    least one row across ni_prices and ni_prices_provisional combined —
+    doesn't matter which auction or which table it came from, only that
+    a row exists. Filling gaps is this job's entire purpose; keeping an
+    already-covered period's provisional value fresher against a later
+    auction revision is not something it tries to do, so once every
+    period has *a* row, there's nothing left to gain by polling further
+    until tomorrow's periods start needing coverage.
+
+    Two small `select datetime` queries — this exists specifically so a
+    run can decide "nothing to do" without ever touching the report list
+    or the IST=1 endpoint, so it stays cheap regardless of how tight the
+    schedule interval is.
+    """
+    day_start_utc, day_end_utc, expected_periods = london_today_bounds()
+    start_iso = day_start_utc.isoformat()
+    end_iso = day_end_utc.isoformat()
+
+    official = (
+        supabase.table("ni_prices")
+        .select("datetime")
+        .gte("datetime", start_iso)
+        .lt("datetime", end_iso)
+        .execute()
+    )
+    provisional = (
+        supabase.table("ni_prices_provisional")
+        .select("datetime")
+        .gte("datetime", start_iso)
+        .lt("datetime", end_iso)
+        .execute()
+    )
+
+    covered = {row["datetime"] for row in official.data} | {row["datetime"] for row in provisional.data}
+    return len(covered) >= expected_periods
 
 
 def fetch_ist_document(doc_id, timeout=30):
