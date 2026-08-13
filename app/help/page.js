@@ -122,10 +122,13 @@ export default function HelpPage() {
       <p className="glossary-lede">
         Northern Ireland and the Republic of Ireland share a single electricity
         market called the SEM. Generators and suppliers trade power through daily
-        auctions, and the price set by each auction is what this site shows. There
-        is no single &ldquo;the price of electricity&rdquo; the way there&rsquo;s a petrol price
-        on a forecourt sign, there&rsquo;s a different price for every half hour of the
-        day, set the day before and then revised as the actual day gets closer.
+        auctions, and the price set by each auction is what this site shows. This
+        is price data only, not a measure of demand or consumption &mdash; there are
+        no figures anywhere on this site for how much electricity is actually
+        being used or generated at any given time. There is no single &ldquo;the
+        price of electricity&rdquo; the way there&rsquo;s a petrol price on a forecourt
+        sign, there&rsquo;s a different price for every half hour of the day, set the
+        day before and then revised as the actual day gets closer.
       </p>
 
       {SECTIONS.map((section) => (
