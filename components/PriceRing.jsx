@@ -17,6 +17,7 @@ import {
 import {
   latestPerPeriod,
   mergeWithProvisional,
+  aggregateDaily,
   AUCTION_LABEL,
   AUCTION_LABEL_SHORT,
   BAND_EXPLANATION,
@@ -284,10 +285,28 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     </div>
   );
 
+  // Plain absolute anchor alongside the ring's relative (this-day-vs-its-
+  // own-trailing-7d-window) colour banding — two days can read as the
+  // same colour pattern while sitting at completely different real price
+  // levels, and there's nothing else on the Ring that answers "was this
+  // day actually cheap or expensive" rather than "cheap or expensive
+  // *for a week like this one*". Reuses aggregateDaily (the same
+  // day-averaging logic the wide-range chart uses) fed the exact rows
+  // segmentsByIndex renders, official-wins-per-period/provisional-fills-
+  // gaps already applied — not a second calculation that could disagree
+  // with what the ring itself is showing for this day.
+  const dailyAverage = useMemo(() => aggregateDaily([...segmentsByIndex.values()])[0], [segmentsByIndex]);
+  const dailyAverageStatus = dailyAverage && (
+    <div className="daily-average">
+      Avg {formatPence(dailyAverage.price_gbp)}p (£{formatGbp(dailyAverage.price_gbp)}/MWh)
+    </div>
+  );
+
   if (error) {
     return (
       <div className={styles.ringCol}>
         {dayNav}
+        {dailyAverageStatus}
         {sourceStatus}
         <div className={styles.ringWrap}>
           <div className={styles.emptyState}>
@@ -317,6 +336,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     return (
       <div className={styles.ringCol}>
         {dayNav}
+        {dailyAverageStatus}
         {sourceStatus}
         <div className={styles.ringWrap}>
           <div className={styles.emptyState}>
@@ -340,6 +360,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   return (
     <div className={styles.ringCol}>
       {dayNav}
+      {dailyAverageStatus}
       {sourceStatus}
       <div className={styles.ringWrap}>
         <svg viewBox="0 0 380 380" width="100%" height="100%">
