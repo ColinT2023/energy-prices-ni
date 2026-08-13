@@ -119,6 +119,13 @@ export default function HelpPage() {
       <p className="eyebrow">NI Electricity · SEM Auctions</p>
       <h1>Help &amp; glossary</h1>
 
+      <p className="glossary-intro">
+        This shows how Northern Ireland&rsquo;s electricity price changes throughout
+        the day &mdash; it isn&rsquo;t a bill calculator and doesn&rsquo;t show how much
+        electricity anyone&rsquo;s using, just what electricity itself costs on the
+        wholesale market at any given moment.
+      </p>
+
       <p className="glossary-lede">
         Northern Ireland and the Republic of Ireland share a single electricity
         market called the SEM. Generators and suppliers trade power through daily
