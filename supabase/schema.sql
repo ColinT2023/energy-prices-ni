@@ -16,6 +16,31 @@ create table if not exists ni_prices (
 
 create index if not exists ni_prices_datetime_idx on ni_prices (datetime);
 
+-- ── Provisional price rows (unofficial, ahead of the CSV) ──────────────────
+-- Populated by scripts/ingest_provisional.py from an undocumented SEMOpx
+-- endpoint that can have real values before the official static-report CSV
+-- exists for the same period (see that script for the full background).
+-- Kept in a table entirely separate from ni_prices, never merged into it —
+-- provisional and official data have different trust levels and lifecycles,
+-- and keeping them apart means withdrawing the feature, or SEMOpx changing
+-- or blocking the endpoint, can never touch confirmed data. No deletion or
+-- reconciliation logic needed: once the real CSV lands and ni_prices has a
+-- period, the frontend simply stops reading the provisional row for it —
+-- rows here are safe to prune periodically since they've no lasting value
+-- once superseded, but nothing depends on that happening.
+create table if not exists ni_prices_provisional (
+  id bigint generated always as identity primary key,
+  datetime timestamptz not null,
+  market text not null,
+  auction text not null,
+  price_eur numeric,
+  price_gbp numeric,
+  fetched_at timestamptz not null default now(),
+  unique (datetime, market, auction)
+);
+
+create index if not exists ni_prices_provisional_datetime_idx on ni_prices_provisional (datetime);
+
 -- ── Ingestion watermark ─────────────────────────────────────────────────────
 -- Single-row table tracking the PublishTime of the last successfully
 -- processed EA-001 report, so the scheduled ingestion workflow only fetches
@@ -89,6 +114,39 @@ cross join lateral (
 ) stats
 where p.market like 'NI%';
 
+-- Same band logic as ni_prices_banded, applied to provisional rows instead
+-- — "low/average/peak" means the same thing everywhere on the site
+-- regardless of which table a price came from. Deliberately still computes
+-- the trailing 7-day window from ni_prices (official), not
+-- ni_prices_provisional: provisional rows are a handful of today's
+-- not-yet-official periods, and letting them feed their own trailing
+-- window would mean the band cutoffs briefly depend on unconfirmed prices
+-- rather than the same confirmed history every other row is judged
+-- against.
+create or replace view ni_prices_provisional_banded as
+select
+  pp.*,
+  stats.trailing_7d_avg,
+  case
+    when pp.price_gbp < stats.trailing_7d_p33 then 'low'
+    when pp.price_gbp > stats.trailing_7d_p67 then 'peak'
+    else 'average'
+  end as band,
+  stats.trailing_7d_p33,
+  stats.trailing_7d_p67
+from ni_prices_provisional pp
+cross join lateral (
+  select
+    avg(q.price_gbp) as trailing_7d_avg,
+    percentile_cont(0.33) within group (order by q.price_gbp) as trailing_7d_p33,
+    percentile_cont(0.67) within group (order by q.price_gbp) as trailing_7d_p67
+  from ni_prices q
+  where q.market like 'NI%'
+    and q.datetime >= pp.datetime - interval '7 days'
+    and q.datetime < pp.datetime
+) stats
+where pp.market like 'NI%';
+
 -- ── Row level security ──────────────────────────────────────────────────────
 -- Public read-only access for the anon key used by the frontend. Writes are
 -- only ever performed by the GitHub Actions workflow using the service role
@@ -109,6 +167,20 @@ create policy "Public read access"
 
 grant select on ni_prices to anon, authenticated;
 grant select on ni_prices_banded to anon, authenticated;
+
+-- Same public-read-only shape as ni_prices: only scripts/ingest_provisional.py
+-- (via the service role key, which bypasses RLS) ever writes here.
+alter table ni_prices_provisional enable row level security;
+
+drop policy if exists "Public read access" on ni_prices_provisional;
+
+create policy "Public read access"
+  on ni_prices_provisional
+  for select
+  using (true);
+
+grant select on ni_prices_provisional to anon, authenticated;
+grant select on ni_prices_provisional_banded to anon, authenticated;
 
 -- ingestion_state has RLS enabled with no policies at all, so it's
 -- unreadable and unwritable by anon/authenticated — only the service role
