@@ -23,6 +23,7 @@ function toPoints(rows) {
     t: new Date(row.datetime).getTime(),
     price: gbpToPence(row.price_gbp),
     band: row.band,
+    provisional: !!row.provisional,
   }));
 }
 
@@ -56,17 +57,42 @@ function toPath(points, scales) {
     .join(" ");
 }
 
+/** Same line as toPath, but as one small path per consecutive point pair
+ * instead of one continuous path — only used when the series actually has
+ * provisional points, so each segment touching one can be drawn dashed
+ * without needing SVG's dasharray to somehow vary partway along a single
+ * path. Segments where neither endpoint is provisional look identical to
+ * the single-path version; this is strictly more expensive to render, so
+ * toPath is still used whenever nothing needs the per-segment styling. */
+function toPathSegments(points, scales) {
+  const segments = [];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    segments.push({
+      key: `${a.t}`,
+      d: `M${scales.x(a.t).toFixed(1)},${scales.y(a.price).toFixed(1)} L${scales.x(b.t).toFixed(1)},${scales.y(b.price).toFixed(1)}`,
+      dashed: a.provisional || b.provisional,
+    });
+  }
+  return segments;
+}
+
 /** One entry per settlement period with data on either line, so hovering
  * shows both day-ahead and intraday even where only one has a point. */
 function buildTooltipPoints(dayAheadPoints, intradayPoints) {
   const byTime = new Map();
   for (const p of dayAheadPoints) {
-    byTime.set(p.t, { t: p.t, dayAhead: p.price, intraday: null });
+    byTime.set(p.t, { t: p.t, dayAhead: p.price, dayAheadProvisional: p.provisional, intraday: null, intradayProvisional: false });
   }
   for (const p of intradayPoints) {
     const existing = byTime.get(p.t);
-    if (existing) existing.intraday = p.price;
-    else byTime.set(p.t, { t: p.t, dayAhead: null, intraday: p.price });
+    if (existing) {
+      existing.intraday = p.price;
+      existing.intradayProvisional = p.provisional;
+    } else {
+      byTime.set(p.t, { t: p.t, dayAhead: null, dayAheadProvisional: false, intraday: p.price, intradayProvisional: p.provisional });
+    }
   }
   return [...byTime.values()].sort((a, b) => a.t - b.t);
 }
@@ -106,8 +132,12 @@ function pointLabel(t, isAggregated) {
 function tooltipText(point, isAggregated) {
   const parts = [pointLabel(point.t, isAggregated)];
   const suffix = isAggregated ? " avg" : "";
-  if (point.dayAhead != null) parts.push(`day ahead ${point.dayAhead.toFixed(1)}p${suffix}`);
-  if (point.intraday != null) parts.push(`intraday ${point.intraday.toFixed(1)}p${suffix}`);
+  if (point.dayAhead != null) {
+    parts.push(`day ahead ${point.dayAhead.toFixed(1)}p${suffix}${point.dayAheadProvisional ? " (provisional)" : ""}`);
+  }
+  if (point.intraday != null) {
+    parts.push(`intraday ${point.intraday.toFixed(1)}p${suffix}${point.intradayProvisional ? " (provisional)" : ""}`);
+  }
   return parts.join(" · ");
 }
 
@@ -167,6 +197,10 @@ export default function PriceHistoryChart({
     () => (scales ? buildHitZones(tooltipPoints, scales) : []),
     [tooltipPoints, scales]
   );
+  const hasProvisional = useMemo(
+    () => dayAheadPoints.some((p) => p.provisional) || intradayPoints.some((p) => p.provisional),
+    [dayAheadPoints, intradayPoints]
+  );
 
   const [activeIndex, setActiveIndex] = useState(null);
   const activePoint = activeIndex != null ? tooltipPoints[activeIndex] : null;
@@ -188,18 +222,44 @@ export default function PriceHistoryChart({
             {GRIDLINE_FRACTIONS.map((f) => (
               <line key={f} x1="0" y1={VIEW_H * f} x2={VIEW_W} y2={VIEW_H * f} stroke="var(--line)" strokeWidth="1" />
             ))}
-            {dayAheadPoints.length > 1 && (
-              <path d={toPath(dayAheadPoints, scales)} fill="none" stroke="var(--text)" strokeWidth="2" pointerEvents="none" />
-            )}
-            {intradayPoints.length > 1 && (
-              <path
-                d={toPath(intradayPoints, scales)}
-                fill="none"
-                stroke="url(#intradayGradient)"
-                strokeWidth="2.5"
-                pointerEvents="none"
-              />
-            )}
+            {dayAheadPoints.length > 1 &&
+              (dayAheadPoints.some((p) => p.provisional) ? (
+                toPathSegments(dayAheadPoints, scales).map((seg) => (
+                  <path
+                    key={seg.key}
+                    d={seg.d}
+                    fill="none"
+                    stroke="var(--text)"
+                    strokeWidth="2"
+                    strokeDasharray={seg.dashed ? "5 3" : undefined}
+                    pointerEvents="none"
+                  />
+                ))
+              ) : (
+                <path d={toPath(dayAheadPoints, scales)} fill="none" stroke="var(--text)" strokeWidth="2" pointerEvents="none" />
+              ))}
+            {intradayPoints.length > 1 &&
+              (intradayPoints.some((p) => p.provisional) ? (
+                toPathSegments(intradayPoints, scales).map((seg) => (
+                  <path
+                    key={seg.key}
+                    d={seg.d}
+                    fill="none"
+                    stroke="url(#intradayGradient)"
+                    strokeWidth="2.5"
+                    strokeDasharray={seg.dashed ? "5 3" : undefined}
+                    pointerEvents="none"
+                  />
+                ))
+              ) : (
+                <path
+                  d={toPath(intradayPoints, scales)}
+                  fill="none"
+                  stroke="url(#intradayGradient)"
+                  strokeWidth="2.5"
+                  pointerEvents="none"
+                />
+              ))}
             {activePoint && (
               <line
                 x1={scales.x(activePoint.t)}
@@ -255,12 +315,14 @@ export default function PriceHistoryChart({
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--text)" }} />
                   Day ahead {activePoint.dayAhead.toFixed(1)}p{isAggregated ? " avg" : ""}
+                  {activePoint.dayAheadProvisional ? " · provisional" : ""}
                 </div>
               )}
               {activePoint.intraday != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--average)" }} />
                   Intraday {activePoint.intraday.toFixed(1)}p{isAggregated ? " avg" : ""}
+                  {activePoint.intradayProvisional ? " · provisional" : ""}
                 </div>
               )}
             </div>
@@ -280,6 +342,7 @@ export default function PriceHistoryChart({
           </span>
         )}
         {isAggregated && <span className="chart-aggregation-note">Showing daily averages — select Today or 7 day for half-hourly detail.</span>}
+        {hasProvisional && <span className="chart-provisional-note">Dashed = provisional, not yet official.</span>}
       </div>
     </div>
   );

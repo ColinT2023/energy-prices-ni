@@ -8,6 +8,7 @@
   --average: #faba05;
   --peak: #e72c7a;
   --now-stroke: #f2f2f0;
+  --positive: #35c46a;
 }
 
 /* --font-display / --font-body / --font-mono are set on <html> by
@@ -162,6 +163,53 @@ h1 {
   line-height: 1.6;
   margin: 0 0 20px;
   max-width: 34ch;
+}
+
+.provisional-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin: 0 0 16px;
+}
+
+.provisional-toggle input {
+  accent-color: var(--text);
+}
+
+.provisional-toggle-note {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.source-status {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+.source-status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.status-dot-on {
+  background: var(--positive);
 }
 
 .legend {
@@ -367,6 +415,11 @@ h1 {
 }
 
 .chart-aggregation-note {
+  flex-basis: 100%;
+  font-style: italic;
+}
+
+.chart-provisional-note {
   flex-basis: 100%;
   font-style: italic;
 }

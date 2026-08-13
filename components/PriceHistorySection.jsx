@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
+import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
 import { presetRange, customRange, TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
-import { dayAheadSeries, latestIntradaySeries } from "../lib/priceSeries";
+import { dayAheadSeries, latestIntradaySeries, mergeWithProvisional } from "../lib/priceSeries";
 import PriceHistoryChart from "./PriceHistoryChart";
 import PriceTable from "./PriceTable";
 
@@ -45,8 +46,14 @@ function rowsForSeries(rows, seriesFilter) {
  * the date scope: the export always matches what's currently shown) —
  * the table is unaffected, it already lists every auction's row
  * regardless of this toggle.
+ *
+ * provisionalEnabled (from the page-level toggle) only ever reaches the
+ * chart, and only for the Today scope — the table and Excel export always
+ * stay on `rows` (official only). Exporting or tabulating unofficial,
+ * possibly-still-changing figures is a different, bigger decision than
+ * showing them live on screen, out of scope for v1.
  */
-export default function PriceHistorySection() {
+export default function PriceHistorySection({ provisionalEnabled = false }) {
   const [scope, setScope] = useState("today");
   const [view, setView] = useState("chart");
   const [seriesFilter, setSeriesFilter] = useState("both");
@@ -59,6 +66,11 @@ export default function PriceHistorySection() {
   }, [scope, customFrom, customTo]);
 
   const { rows, error } = useNiPrices(range);
+  const provisionalRows = useProvisionalPrices(provisionalEnabled && scope === "today", range);
+  const chartRows = useMemo(
+    () => (scope === "today" ? mergeWithProvisional(rows, provisionalRows) : rows),
+    [rows, provisionalRows, scope]
+  );
   const [exporting, setExporting] = useState(false);
 
   async function handleExport() {
@@ -157,7 +169,7 @@ export default function PriceHistorySection() {
       {error && <p role="alert">Couldn&apos;t load price history: {error}</p>}
       {view === "chart" ? (
         <PriceHistoryChart
-          rows={rows}
+          rows={chartRows}
           seriesFilter={seriesFilter}
           emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
         />

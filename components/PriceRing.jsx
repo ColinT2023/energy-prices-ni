@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useNiPrices } from "../hooks/useNiPrices";
+import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
 import { dayRange, TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import {
   londonMidnightUtc,
@@ -13,7 +14,7 @@ import {
   shiftYmd,
   periodsInLondonDay,
 } from "../lib/londonTime";
-import { latestPerPeriod, AUCTION_LABEL, BAND_EXPLANATION } from "../lib/priceSeries";
+import { latestPerPeriod, mergeWithProvisional, AUCTION_LABEL, BAND_EXPLANATION } from "../lib/priceSeries";
 import styles from "./PriceRing.module.css";
 
 // Segment count is *not* a fixed 48: the UK/Ireland clock change days have
@@ -69,7 +70,7 @@ function gbpToPence(priceGbp) {
  * one with data. Owns its own data fetch (day-scoped, not the open-ended
  * "today onward" the rest of the page uses) so this stays self-contained.
  */
-export default function PriceRing() {
+export default function PriceRing({ provisionalEnabled = false }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
@@ -130,17 +131,26 @@ export default function PriceRing() {
   const range = useMemo(() => dayRange(selectedDate), [selectedDate]);
   const { rows, loading, error } = useNiPrices(range);
 
+  // Only fetched for today — see the Provisional data toggle scope notes:
+  // the gap this fills only exists for the current day, past days already
+  // have official data by the time they're viewed.
+  const provisionalRows = useProvisionalPrices(provisionalEnabled && isToday, range);
+  const mergedRows = useMemo(
+    () => (isToday ? mergeWithProvisional(rows, provisionalRows) : rows),
+    [rows, provisionalRows, isToday]
+  );
+
   const dayStart = useMemo(() => londonMidnightUtc(new Date(selectedDate)), [selectedDate]);
   const periods = useMemo(() => periodsInLondonDay(new Date(selectedDate)), [selectedDate]);
 
   const segmentsByIndex = useMemo(() => {
     const byIndex = new Map();
-    for (const row of latestPerPeriod(rows)) {
+    for (const row of latestPerPeriod(mergedRows)) {
       const idx = settlementPeriodIndex(row.datetime, dayStart);
       if (idx >= 0 && idx < periods) byIndex.set(idx, row);
     }
     return byIndex;
-  }, [rows, dayStart, periods]);
+  }, [mergedRows, dayStart, periods]);
 
   // Major-hour label -> segment index lookup, walking only even indices
   // (every segment that starts a new local hour). Built from the actual
@@ -167,7 +177,8 @@ export default function PriceRing() {
   function segmentTooltip(index, row) {
     const label = periodLabel(dayStart.getTime() + index * 30 * 60000);
     if (!row) return `${label} · no data`;
-    return `${label} · ${gbpToPence(row.price_gbp).toFixed(1)}p · ${row.band}`;
+    const provisionalNote = row.provisional ? " · provisional, not yet official" : "";
+    return `${label} · ${gbpToPence(row.price_gbp).toFixed(1)}p · ${row.band}${provisionalNote}`;
   }
 
   const canGoPrevious = !earliestDate || selectedDate > earliestDate;
@@ -214,10 +225,29 @@ export default function PriceRing() {
     </div>
   );
 
+  // Whether each source has any data for the day currently being viewed —
+  // Provisional is only ever meaningfully "on" for today, since it's
+  // never fetched for other days (see provisionalRows above), so it
+  // correctly reads as grey/off for any past day even while the toggle
+  // itself is on.
+  const sourceStatus = provisionalEnabled && (
+    <div className="source-status">
+      <span className="source-status-item">
+        <span className={`status-dot ${rows.length > 0 ? "status-dot-on" : ""}`} />
+        Official
+      </span>
+      <span className="source-status-item">
+        <span className={`status-dot ${isToday && provisionalRows.length > 0 ? "status-dot-on" : ""}`} />
+        Provisional
+      </span>
+    </div>
+  );
+
   if (error) {
     return (
       <div className={styles.ringCol}>
         {dayNav}
+        {sourceStatus}
         <div className={styles.ringWrap}>
           <div className={styles.emptyState}>
             <p role="alert">Couldn&apos;t load prices: {error}</p>
@@ -231,11 +261,14 @@ export default function PriceRing() {
   // afternoon before delivery, not at midnight — so that's a "check back
   // later" state, not an error. A past day with nothing recorded is a
   // genuine gap, worded differently. Either way this replaces the whole
-  // ring rather than leaving 48 silent grey "no data" segments.
+  // ring rather than leaving 48 silent grey "no data" segments. Provisional
+  // rows already merged into segmentsByIndex above, so this only triggers
+  // when *neither* source has anything for the day.
   if (!loading && segmentsByIndex.size === 0) {
     return (
       <div className={styles.ringCol}>
         {dayNav}
+        {sourceStatus}
         <div className={styles.ringWrap}>
           <div className={styles.emptyState}>
             <p>{isToday ? TODAY_NOT_PUBLISHED_MESSAGE : `No prices recorded for ${formatLongDate(selectedDate)}.`}</p>
@@ -248,6 +281,7 @@ export default function PriceRing() {
   return (
     <div className={styles.ringCol}>
       {dayNav}
+      {sourceStatus}
       <div className={styles.ringWrap}>
         <svg viewBox="0 0 380 380" width="100%" height="100%">
           {Array.from({ length: periods }, (_, i) => {
@@ -256,14 +290,23 @@ export default function PriceRing() {
             const endAngle = (360 / periods) * (i + 1) - 90 - GAP_DEG / 2;
             const d = describeArc(CENTRE, CENTRE, OUTER_R, INNER_R, startAngle, endAngle);
             const isCurrent = i === currentIndex;
+            const isProvisional = !!row?.provisional;
+            // Provisional segments get a dashed outline in their own band
+            // colour and a dimmer fill — structurally different from a
+            // confirmed segment, not just a label, so it can't be mistaken
+            // for one at a glance or in a screenshot. The "now" highlight
+            // (solid stroke) still wins visually when a segment is both
+            // current and provisional, since "this is now" and "this is
+            // unconfirmed" are two different things to communicate at once.
             return (
               <path
                 key={i}
                 d={d}
                 fill={row ? BAND_COLOUR[row.band] : "var(--line)"}
-                opacity={isCurrent ? 1 : 0.6}
-                stroke={isCurrent ? "var(--now-stroke)" : "none"}
-                strokeWidth={isCurrent ? 2 : 0}
+                opacity={isCurrent ? (isProvisional ? 0.85 : 1) : isProvisional ? 0.4 : 0.6}
+                stroke={isCurrent ? "var(--now-stroke)" : isProvisional ? BAND_COLOUR[row.band] : "none"}
+                strokeWidth={isCurrent ? 2 : isProvisional ? 1.2 : 0}
+                strokeDasharray={!isCurrent && isProvisional ? "3 2" : undefined}
                 className={isCurrent ? "pulse-segment" : undefined}
                 tabIndex={0}
                 aria-label={segmentTooltip(i, row)}
@@ -350,6 +393,7 @@ export default function PriceRing() {
             <>
               <div className={styles.unit}>
                 per kWh{current ? ` · ${AUCTION_LABEL[current.auction] ?? current.auction}` : ""}
+                {current?.provisional ? " · provisional" : ""}
               </div>
               <div className={styles.period} style={{ color: currentColour }}>
                 {periodLabel(dayStart.getTime() + currentIndex * 30 * 60000)} · now

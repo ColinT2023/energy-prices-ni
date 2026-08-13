@@ -1,10 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import PriceRing from "../components/PriceRing";
 import PriceHistorySection from "../components/PriceHistorySection";
 import DataAsOf from "../components/DataAsOf";
+import ProvisionalToggle from "../components/ProvisionalToggle";
 
 export default function HomePage() {
+  // Off by default, shared between the Ring and the chart's Today scope —
+  // see the Provisional data toggle scope notes for why it's just those
+  // two, not the table or export.
+  const [provisionalEnabled, setProvisionalEnabled] = useState(false);
+
   return (
     <div className="page-wrap">
       <div className="eyebrow-row">
@@ -14,8 +21,9 @@ export default function HomePage() {
       <h1>Northern Ireland energy prices</h1>
 
       <div className="hero">
-        <PriceRing />
+        <PriceRing provisionalEnabled={provisionalEnabled} />
         <div className="hero-side">
+          <ProvisionalToggle enabled={provisionalEnabled} onChange={setProvisionalEnabled} />
           <p>
             Each segment is one half hourly settlement period. Use the arrows
             or date picker above the ring to browse other days &mdash; the
@@ -25,7 +33,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <PriceHistorySection />
+      <PriceHistorySection provisionalEnabled={provisionalEnabled} />
     </div>
   );
 }
