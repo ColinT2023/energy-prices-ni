@@ -48,10 +48,14 @@ function rowsForSeries(rows, seriesFilter) {
  * regardless of this toggle.
  *
  * provisionalEnabled (from the page-level toggle) only ever reaches the
- * chart, and only for the Today scope — the table and Excel export always
- * stay on `rows` (official only). Exporting or tabulating unofficial,
+ * chart (chartRows), never the table or Excel export, which always stay
+ * on `rows` (official only) — exporting or tabulating unofficial,
  * possibly-still-changing figures is a different, bigger decision than
- * showing them live on screen, out of scope for v1.
+ * showing them live on screen, out of scope for v1. Not restricted to any
+ * particular scope, though: provisionalRows is fetched for whatever range
+ * is active and merges in wherever it actually has something, since how
+ * far back provisional data can reach is the backend's call
+ * (nothing_left_to_poll), not a boundary re-derived here.
  */
 export default function PriceHistorySection({ provisionalEnabled = false }) {
   const [scope, setScope] = useState("today");
@@ -66,11 +70,15 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
   }, [scope, customFrom, customTo]);
 
   const { rows, error } = useNiPrices(range);
-  const provisionalRows = useProvisionalPrices(provisionalEnabled && scope === "today", range);
-  const chartRows = useMemo(
-    () => (scope === "today" ? mergeWithProvisional(rows, provisionalRows) : rows),
-    [rows, provisionalRows, scope]
-  );
+  // Fetched for whatever scope is active, not just "today" — same
+  // reasoning as PriceRing: the backend's nothing_left_to_poll() is the
+  // one place that decides how far provisional data can actually reach
+  // (today plus a bounded trailing window into yesterday), so this
+  // doesn't keep a second, independently-maintained copy of that
+  // boundary. A scope outside that window just gets an empty result and
+  // mergeWithProvisional is a no-op.
+  const provisionalRows = useProvisionalPrices(provisionalEnabled, range);
+  const chartRows = useMemo(() => mergeWithProvisional(rows, provisionalRows), [rows, provisionalRows]);
   const [exporting, setExporting] = useState(false);
 
   async function handleExport() {

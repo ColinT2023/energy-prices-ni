@@ -7,9 +7,10 @@ import DataAsOf from "../components/DataAsOf";
 import ProvisionalToggle from "../components/ProvisionalToggle";
 
 export default function HomePage() {
-  // Off by default, shared between the Ring and the chart's Today scope —
-  // see the Provisional data toggle scope notes for why it's just those
-  // two, not the table or export.
+  // Off by default, shared between the Ring and the chart (not the table
+  // or export — see PriceHistorySection). Neither component restricts
+  // provisional data to any particular day or scope; the backend decides
+  // how far back it can actually reach.
   const [provisionalEnabled, setProvisionalEnabled] = useState(false);
 
   return (

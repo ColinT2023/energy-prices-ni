@@ -78,7 +78,7 @@ const SECTIONS = [
       },
       {
         term: "Where it appears",
-        body: "Only on the Ring and the Today view of the price history chart, and only when you turn it on — off by default. Not in the table or the Excel export: exporting or tabulating figures that could still change is a bigger step than just showing them live on screen.",
+        body: "Only on the Ring and the price history chart, and only when you turn it on — off by default. Not in the table or the Excel export: exporting or tabulating figures that could still change is a bigger step than just showing them live on screen. It isn't limited to today specifically — browse back a day and it can still fill in a trailing period or two that the official pipeline hadn't caught up on yet, but in practice you'll rarely see it anywhere except today and, occasionally, the tail end of yesterday.",
       },
       {
         term: "How to tell it apart",

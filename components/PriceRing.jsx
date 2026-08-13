@@ -131,14 +131,15 @@ export default function PriceRing({ provisionalEnabled = false }) {
   const range = useMemo(() => dayRange(selectedDate), [selectedDate]);
   const { rows, loading, error } = useNiPrices(range);
 
-  // Only fetched for today — see the Provisional data toggle scope notes:
-  // the gap this fills only exists for the current day, past days already
-  // have official data by the time they're viewed.
-  const provisionalRows = useProvisionalPrices(provisionalEnabled && isToday, range);
-  const mergedRows = useMemo(
-    () => (isToday ? mergeWithProvisional(rows, provisionalRows) : rows),
-    [rows, provisionalRows, isToday]
-  );
+  // Fetched for whichever day is selected, not just today — the backend's
+  // own nothing_left_to_poll() is what actually decides how far back
+  // provisional data can exist (today plus a bounded trailing window into
+  // yesterday), so the frontend doesn't keep a second copy of that
+  // boundary to predict it in advance. A day outside that window just
+  // gets an empty result and mergeWithProvisional is a no-op, the same
+  // way an ordinary day with no official rows yet already behaves.
+  const provisionalRows = useProvisionalPrices(provisionalEnabled, range);
+  const mergedRows = useMemo(() => mergeWithProvisional(rows, provisionalRows), [rows, provisionalRows]);
 
   const dayStart = useMemo(() => londonMidnightUtc(new Date(selectedDate)), [selectedDate]);
   const periods = useMemo(() => periodsInLondonDay(new Date(selectedDate)), [selectedDate]);
@@ -225,11 +226,12 @@ export default function PriceRing({ provisionalEnabled = false }) {
     </div>
   );
 
-  // Whether each source has any data for the day currently being viewed —
-  // Provisional is only ever meaningfully "on" for today, since it's
-  // never fetched for other days (see provisionalRows above), so it
-  // correctly reads as grey/off for any past day even while the toggle
-  // itself is on.
+  // Whether each source has any data for the day currently being viewed.
+  // Provisional is fetched for whatever day is selected (see
+  // provisionalRows above), so this dot reflects the real result rather
+  // than an assumption about which days it could apply to — it'll read
+  // green for yesterday too, exactly when the backend's own trailing
+  // window actually has something there.
   const sourceStatus = provisionalEnabled && (
     <div className="source-status">
       <span className="source-status-item">
@@ -237,7 +239,7 @@ export default function PriceRing({ provisionalEnabled = false }) {
         Official
       </span>
       <span className="source-status-item">
-        <span className={`status-dot ${isToday && provisionalRows.length > 0 ? "status-dot-on" : ""}`} />
+        <span className={`status-dot ${provisionalRows.length > 0 ? "status-dot-on" : ""}`} />
         Provisional
       </span>
     </div>

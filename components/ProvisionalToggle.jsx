@@ -16,7 +16,7 @@ export default function ProvisionalToggle({ enabled, onChange }) {
         onChange={(e) => onChange(e.target.checked)}
       />
       Show provisional prices
-      <span className="provisional-toggle-note">unofficial, today only</span>
+      <span className="provisional-toggle-note">unofficial, wherever official data hasn't landed yet</span>
     </label>
   );
 }
