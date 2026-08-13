@@ -55,7 +55,12 @@
 .ringWrap {
   position: relative;
   width: 100%;
-  max-width: 380px;
+  /* Grown from 380px to make room for the centre's added £/MWh line
+     without wrapping/crowding the text beneath it — the SVG geometry
+     (drawn via viewBox) and the centre text overlay (sized as a
+     percentage of this element) both scale up with it, so nothing else
+     needed to change to accommodate the extra line. */
+  max-width: 430px;
   aspect-ratio: 1 / 1;
 }
 
@@ -115,6 +120,13 @@
   height: 11px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.gbpPrice {
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 
 .unit {

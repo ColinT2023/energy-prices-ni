@@ -425,6 +425,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
           </div>
           {isToday && (
             <>
+              {current && <div className={styles.gbpPrice}>£{Math.round(current.price_gbp)}/MWh</div>}
               <div className={styles.unit}>
                 per kWh{current ? ` · ${AUCTION_LABEL[current.auction] ?? current.auction}` : ""}
                 {current?.provisional ? " · provisional" : ""}
