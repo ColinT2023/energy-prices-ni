@@ -7,7 +7,7 @@ import { AUCTION_LABEL } from "../lib/priceSeries";
 const BAND_LABEL = { low: "Low", average: "Average", peak: "Peak" };
 const BAND_COLOUR = { low: "var(--low)", average: "var(--average)", peak: "var(--peak)" };
 
-const COLUMNS = [
+const BASE_COLUMNS = [
   {
     key: "datetime",
     label: "Settlement period",
@@ -23,6 +23,7 @@ const COLUMNS = [
   { key: "price_gbp", label: "Price (£/MWh)" },
   { key: "band", label: "Band" },
 ];
+const STATUS_COLUMN = { key: "status", label: "Status" };
 
 function gbpToPence(priceGbp) {
   return priceGbp / 10;
@@ -34,13 +35,26 @@ function gbpToPence(priceGbp) {
  * intraday revisions are visible side by side. Carries the same
  * information as the ring/chart in text form, per the brief's
  * accessibility floor: band is never colour-only here.
+ *
+ * The Status column only appears when `rows` actually contains a
+ * provisional row (the same `provisional` flag mergeWithProvisional
+ * tags them with) — inferred from the data itself rather than a
+ * separate prop, so a toggle-off render (never any provisional rows)
+ * looks exactly as it did before this column existed.
  */
 export default function PriceTable({ rows }) {
   const [sortKey, setSortKey] = useState("datetime");
   const [sortDir, setSortDir] = useState("desc");
 
+  const hasProvisional = useMemo(() => rows.some((row) => row.provisional), [rows]);
+  const columns = hasProvisional ? [...BASE_COLUMNS, STATUS_COLUMN] : BASE_COLUMNS;
+
   const sorted = useMemo(() => {
-    const withPence = rows.map((row) => ({ ...row, pence: gbpToPence(row.price_gbp) }));
+    const withPence = rows.map((row) => ({
+      ...row,
+      pence: gbpToPence(row.price_gbp),
+      status: row.provisional ? "Provisional" : "Official",
+    }));
     const dir = sortDir === "asc" ? 1 : -1;
     return withPence.sort((a, b) => {
       const av = a[sortKey];
@@ -71,7 +85,7 @@ export default function PriceTable({ rows }) {
       <table className="price-table">
         <thead>
           <tr>
-            {COLUMNS.map((col) => (
+            {columns.map((col) => (
               <th
                 key={col.key}
                 aria-sort={sortKey === col.key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
@@ -96,6 +110,9 @@ export default function PriceTable({ rows }) {
                 <span className="band-dot" style={{ background: BAND_COLOUR[row.band] }} />
                 {BAND_LABEL[row.band] ?? row.band}
               </td>
+              {hasProvisional && (
+                <td className={row.provisional ? "status-provisional" : undefined}>{row.status}</td>
+              )}
             </tr>
           ))}
         </tbody>

@@ -518,6 +518,11 @@ h1 {
   margin-right: 6px;
 }
 
+.status-provisional {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .line-sample {
   width: 16px;
   height: 2px;

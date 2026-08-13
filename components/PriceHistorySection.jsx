@@ -47,14 +47,17 @@ function rowsForSeries(rows, seriesFilter) {
  * the table is unaffected, it already lists every auction's row
  * regardless of this toggle.
  *
- * provisionalEnabled (from the page-level toggle) only ever reaches the
- * chart (chartRows), never the table or Excel export, which always stay
- * on `rows` (official only) — exporting or tabulating unofficial,
- * possibly-still-changing figures is a different, bigger decision than
- * showing them live on screen, out of scope for v1. Not restricted to any
- * particular scope, though: provisionalRows is fetched for whatever range
- * is active and merges in wherever it actually has something, since how
- * far back provisional data can reach is the backend's call
+ * provisionalEnabled (from the page-level toggle) drives the chart, the
+ * table, and the export alike — all three read from the same
+ * `displayRows`, so there's one merge, not three independent ones that
+ * could drift. When the toggle's off, provisionalRows is always empty
+ * (see useProvisionalPrices), which makes mergeWithProvisional a no-op —
+ * displayRows is then identical in content to `rows`, so every surface
+ * behaves exactly as it did before this existed, with no separate
+ * "toggle off" code path to keep in sync. Not restricted to any
+ * particular scope: provisionalRows is fetched for whatever range is
+ * active and merges in wherever it actually has something, since how far
+ * back provisional data can reach is the backend's call
  * (nothing_left_to_poll), not a boundary re-derived here.
  */
 export default function PriceHistorySection({ provisionalEnabled = false }) {
@@ -70,22 +73,15 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
   }, [scope, customFrom, customTo]);
 
   const { rows, error } = useNiPrices(range);
-  // Fetched for whatever scope is active, not just "today" — same
-  // reasoning as PriceRing: the backend's nothing_left_to_poll() is the
-  // one place that decides how far provisional data can actually reach
-  // (today plus a bounded trailing window into yesterday), so this
-  // doesn't keep a second, independently-maintained copy of that
-  // boundary. A scope outside that window just gets an empty result and
-  // mergeWithProvisional is a no-op.
   const provisionalRows = useProvisionalPrices(provisionalEnabled, range);
-  const chartRows = useMemo(() => mergeWithProvisional(rows, provisionalRows), [rows, provisionalRows]);
+  const displayRows = useMemo(() => mergeWithProvisional(rows, provisionalRows), [rows, provisionalRows]);
   const [exporting, setExporting] = useState(false);
 
   async function handleExport() {
     setExporting(true);
     try {
       const suffix = scope === "custom" ? `${customFrom}-to-${customTo}` : scope;
-      await exportToExcel({ rows: rowsForSeries(rows, seriesFilter), filenameSuffix: suffix });
+      await exportToExcel({ rows: rowsForSeries(displayRows, seriesFilter), filenameSuffix: suffix });
     } finally {
       setExporting(false);
     }
@@ -139,7 +135,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
             type="button"
             className="export-button"
             onClick={handleExport}
-            disabled={exporting || rows.length === 0}
+            disabled={exporting || displayRows.length === 0}
           >
             {exporting ? "Exporting…" : "Export .xlsx"}
           </button>
@@ -177,12 +173,12 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
       {error && <p role="alert">Couldn&apos;t load price history: {error}</p>}
       {view === "chart" ? (
         <PriceHistoryChart
-          rows={chartRows}
+          rows={displayRows}
           seriesFilter={seriesFilter}
           emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
         />
       ) : (
-        <PriceTable rows={rowsForSeries(rows, seriesFilter)} />
+        <PriceTable rows={rowsForSeries(displayRows, seriesFilter)} />
       )}
     </div>
   );
