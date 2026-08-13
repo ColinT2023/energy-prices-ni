@@ -22,7 +22,7 @@ export default function HomePage() {
       <h1>Northern Ireland energy prices</h1>
 
       <div className="hero">
-        <PriceRing provisionalEnabled={provisionalEnabled} />
+        <PriceRing provisionalEnabled={provisionalEnabled} onEnableProvisional={() => setProvisionalEnabled(true)} />
         <div className="hero-side">
           <ProvisionalToggle enabled={provisionalEnabled} onChange={setProvisionalEnabled} />
           <p>

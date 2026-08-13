@@ -70,7 +70,7 @@ function gbpToPence(priceGbp) {
  * one with data. Owns its own data fetch (day-scoped, not the open-ended
  * "today onward" the rest of the page uses) so this stays self-contained.
  */
-export default function PriceRing({ provisionalEnabled = false }) {
+export default function PriceRing({ provisionalEnabled = false, onEnableProvisional }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
@@ -131,15 +131,24 @@ export default function PriceRing({ provisionalEnabled = false }) {
   const range = useMemo(() => dayRange(selectedDate), [selectedDate]);
   const { rows, loading, error } = useNiPrices(range);
 
-  // Fetched for whichever day is selected, not just today — the backend's
-  // own nothing_left_to_poll() is what actually decides how far back
-  // provisional data can exist (today plus a bounded trailing window into
-  // yesterday), so the frontend doesn't keep a second copy of that
-  // boundary to predict it in advance. A day outside that window just
-  // gets an empty result and mergeWithProvisional is a no-op, the same
-  // way an ordinary day with no official rows yet already behaves.
-  const provisionalRows = useProvisionalPrices(provisionalEnabled, range);
-  const mergedRows = useMemo(() => mergeWithProvisional(rows, provisionalRows), [rows, provisionalRows]);
+  // Fetched unconditionally — not gated by provisionalEnabled — for
+  // whichever day is selected, not just today. Two different things read
+  // this: the empty state below needs to know whether provisional data
+  // exists even while the toggle is off, so it can offer to turn it on
+  // rather than just saying "nothing yet" when there's actually something
+  // available; mergedRows still only folds it into what's rendered when
+  // the toggle is actually on, so the Ring itself never shows provisional
+  // data until someone turns it on — fetching it early doesn't change
+  // that. (The backend's own nothing_left_to_poll() is what actually
+  // decides how far back provisional data can exist, today plus a
+  // bounded trailing window into yesterday, so this doesn't keep a second
+  // copy of that boundary to predict it in advance — a day outside that
+  // window just gets an empty result.)
+  const provisionalRows = useProvisionalPrices(true, range);
+  const mergedRows = useMemo(
+    () => (provisionalEnabled ? mergeWithProvisional(rows, provisionalRows) : rows),
+    [rows, provisionalRows, provisionalEnabled]
+  );
 
   const dayStart = useMemo(() => londonMidnightUtc(new Date(selectedDate)), [selectedDate]);
   const periods = useMemo(() => periodsInLondonDay(new Date(selectedDate)), [selectedDate]);
@@ -268,17 +277,35 @@ export default function PriceRing({ provisionalEnabled = false }) {
   // afternoon before delivery, not at midnight — so that's a "check back
   // later" state, not an error. A past day with nothing recorded is a
   // genuine gap, worded differently. Either way this replaces the whole
-  // ring rather than leaving 48 silent grey "no data" segments. Provisional
-  // rows already merged into segmentsByIndex above, so this only triggers
-  // when *neither* source has anything for the day.
+  // ring rather than leaving 48 silent grey "no data" segments. When the
+  // toggle's on, provisional rows are already merged into segmentsByIndex
+  // above, so this only triggers when *neither* source has anything for
+  // the day. When the toggle's off, though, official can be genuinely
+  // empty while provisional (fetched unconditionally, see above) actually
+  // has something — that's the one case with an actionable answer instead
+  // of "check back later": offer to turn the toggle on right here, rather
+  // than expecting someone to separately notice the header text or find
+  // the checkbox themselves.
   if (!loading && segmentsByIndex.size === 0) {
+    const provisionalPeriodCount = new Set(provisionalRows.map((row) => row.datetime)).size;
+    const canOfferProvisional = isToday && !provisionalEnabled && provisionalPeriodCount > 0;
     return (
       <div className={styles.ringCol}>
         {dayNav}
         {sourceStatus}
         <div className={styles.ringWrap}>
           <div className={styles.emptyState}>
-            <p>{isToday ? TODAY_NOT_PUBLISHED_MESSAGE : `No prices recorded for ${formatLongDate(selectedDate)}.`}</p>
+            {canOfferProvisional ? (
+              <p>
+                No confirmed prices yet, but {provisionalPeriodCount} provisional price
+                {provisionalPeriodCount === 1 ? " is" : "s are"} available now.{" "}
+                <button type="button" className="inline-link-button" onClick={onEnableProvisional}>
+                  Show provisional prices
+                </button>
+              </p>
+            ) : (
+              <p>{isToday ? TODAY_NOT_PUBLISHED_MESSAGE : `No prices recorded for ${formatLongDate(selectedDate)}.`}</p>
+            )}
           </div>
         </div>
       </div>

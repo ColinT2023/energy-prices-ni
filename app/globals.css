@@ -140,6 +140,21 @@ h1 {
   font-size: 14px;
 }
 
+.inline-link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.inline-link-button:hover,
+.inline-link-button:focus-visible {
+  color: var(--text-muted);
+}
+
 .hero {
   display: flex;
   align-items: center;
