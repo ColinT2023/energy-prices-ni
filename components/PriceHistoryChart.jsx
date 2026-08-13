@@ -22,6 +22,7 @@ function toPoints(rows) {
   return rows.map((row) => ({
     t: new Date(row.datetime).getTime(),
     price: gbpToPence(row.price_gbp),
+    priceGbp: row.price_gbp,
     band: row.band,
     provisional: !!row.provisional,
   }));
@@ -83,15 +84,32 @@ function toPathSegments(points, scales) {
 function buildTooltipPoints(dayAheadPoints, intradayPoints) {
   const byTime = new Map();
   for (const p of dayAheadPoints) {
-    byTime.set(p.t, { t: p.t, dayAhead: p.price, dayAheadProvisional: p.provisional, intraday: null, intradayProvisional: false });
+    byTime.set(p.t, {
+      t: p.t,
+      dayAhead: p.price,
+      dayAheadGbp: p.priceGbp,
+      dayAheadProvisional: p.provisional,
+      intraday: null,
+      intradayGbp: null,
+      intradayProvisional: false,
+    });
   }
   for (const p of intradayPoints) {
     const existing = byTime.get(p.t);
     if (existing) {
       existing.intraday = p.price;
+      existing.intradayGbp = p.priceGbp;
       existing.intradayProvisional = p.provisional;
     } else {
-      byTime.set(p.t, { t: p.t, dayAhead: null, dayAheadProvisional: false, intraday: p.price, intradayProvisional: p.provisional });
+      byTime.set(p.t, {
+        t: p.t,
+        dayAhead: null,
+        dayAheadGbp: null,
+        dayAheadProvisional: false,
+        intraday: p.price,
+        intradayGbp: p.priceGbp,
+        intradayProvisional: p.provisional,
+      });
     }
   }
   return [...byTime.values()].sort((a, b) => a.t - b.t);
@@ -133,10 +151,14 @@ function tooltipText(point, isAggregated) {
   const parts = [pointLabel(point.t, isAggregated)];
   const suffix = isAggregated ? " avg" : "";
   if (point.dayAhead != null) {
-    parts.push(`day ahead ${point.dayAhead.toFixed(1)}p${suffix}${point.dayAheadProvisional ? " (provisional)" : ""}`);
+    parts.push(
+      `day ahead ${point.dayAhead.toFixed(1)}p · £${Math.round(point.dayAheadGbp)}/MWh${suffix}${point.dayAheadProvisional ? " (provisional)" : ""}`
+    );
   }
   if (point.intraday != null) {
-    parts.push(`intraday ${point.intraday.toFixed(1)}p${suffix}${point.intradayProvisional ? " (provisional)" : ""}`);
+    parts.push(
+      `intraday ${point.intraday.toFixed(1)}p · £${Math.round(point.intradayGbp)}/MWh${suffix}${point.intradayProvisional ? " (provisional)" : ""}`
+    );
   }
   return parts.join(" · ");
 }
@@ -314,14 +336,16 @@ export default function PriceHistoryChart({
               {activePoint.dayAhead != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--text)" }} />
-                  Day ahead {activePoint.dayAhead.toFixed(1)}p{isAggregated ? " avg" : ""}
+                  Day ahead {activePoint.dayAhead.toFixed(1)}p · £{Math.round(activePoint.dayAheadGbp)}/MWh
+                  {isAggregated ? " avg" : ""}
                   {activePoint.dayAheadProvisional ? " · provisional" : ""}
                 </div>
               )}
               {activePoint.intraday != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--average)" }} />
-                  Intraday {activePoint.intraday.toFixed(1)}p{isAggregated ? " avg" : ""}
+                  Intraday {activePoint.intraday.toFixed(1)}p · £{Math.round(activePoint.intradayGbp)}/MWh
+                  {isAggregated ? " avg" : ""}
                   {activePoint.intradayProvisional ? " · provisional" : ""}
                 </div>
               )}
