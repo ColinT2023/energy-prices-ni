@@ -1,0 +1,37 @@
+name: Ingest NI provisional prices
+
+on:
+  # A much smaller payload than the main pipeline (a handful of pending
+  # reports at most, one small JSON request each) — safe to run more
+  # frequently, which is the point: this exists specifically to close the
+  # "today shows nothing yet" gap sooner than the main pipeline's own
+  # cadence could.
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ingest-provisional:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run provisional ingestion
+        working-directory: scripts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Kill switch — set to "false" as a repo Variable (not a secret,
+          # it isn't sensitive) to stop this job doing anything at all,
+          # no code deploy needed. Unset/anything else means enabled.
+          PROVISIONAL_INGESTION_ENABLED: ${{ vars.PROVISIONAL_INGESTION_ENABLED }}
+        run: python ingest_provisional.py
