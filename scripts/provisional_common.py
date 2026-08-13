@@ -132,6 +132,29 @@ def fetch_ist_document(doc_id, timeout=30):
     return doc
 
 
+def _ist_timestamp_to_utc_iso(ts):
+    """
+    Convert one IST=1 Index-prices timestamp to a proper UTC ISO string.
+
+    These timestamps are naive (no "Z"), and were previously assumed UTC
+    on the theory that this API family's fields are UTC despite the
+    missing suffix — true for PublishTime (see
+    ni_prices_common.parse_publish_time), but confirmed WRONG for this
+    field specifically: fetching the IST=1 JSON for an already-published
+    report and comparing it against that same report's official CSV
+    (whose Index-prices timestamps carry an explicit, genuine "Z") shows
+    the same price value sitting under a JSON timestamp exactly one hour
+    ahead of its true UTC timestamp during BST. So these are actually
+    Europe/London *local* wall-clock time. Converted properly via
+    zoneinfo (not a hardcoded hour offset) so this stays correct across
+    the DST boundary too.
+    """
+    if ts.endswith("Z"):
+        return ts
+    local = datetime.fromisoformat(ts).replace(tzinfo=LONDON_TZ)
+    return local.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def parse_ist_document(doc):
     """
     Extract NI-market price records from an IST=1 document — the JSON
@@ -186,11 +209,7 @@ def parse_ist_document(doc):
                         continue
                     records.append(
                         {
-                            # Naive, no "Z" suffix, but UTC despite that —
-                            # same pattern already confirmed for this API
-                            # family's PublishTime (see
-                            # ni_prices_common.parse_publish_time).
-                            "datetime": ts if ts.endswith("Z") else ts + "Z",
+                            "datetime": _ist_timestamp_to_utc_iso(ts),
                             "market": current_market,
                             "auction": auction_id,
                             "currency": currency,
