@@ -78,11 +78,36 @@ const SECTIONS = [
       },
       {
         term: "Where it appears",
-        body: "Only on the Ring and the price history chart, and only when you turn it on — off by default. Not in the table or the Excel export: exporting or tabulating figures that could still change is a bigger step than just showing them live on screen. It isn't limited to today specifically — browse back a day and it can still fill in a trailing period or two that the official pipeline hadn't caught up on yet, but in practice you'll rarely see it anywhere except today and, occasionally, the tail end of yesterday.",
+        body: "One toggle governs all four places prices show up on this site — the Ring, the price history chart, the table, and the Excel export — and only when you turn it on, off by default. The same rule applies everywhere: official wins for any period it covers, provisional only fills in periods official hasn't reached yet. In the table and the export specifically, a Status column marks each row Official or Provisional so it's identifiable on its own, not just inferred from a dashed line. It isn't limited to today specifically — browse back a day and it can still fill in a trailing period or two that the official pipeline hadn't caught up on yet, but in practice you'll rarely see it anywhere except today and, occasionally, the tail end of yesterday.",
       },
       {
         term: "How to tell it apart",
         body: "A dashed, dimmer segment on the Ring, a dashed line on the chart, and a “provisional” note wherever a price appears — never blended into a confirmed figure without that marking. A count next to the Ring's date picker (for example “46 official · 2 provisional”) shows exactly how much of the day you're viewing is confirmed versus not, rather than just whether each source has anything at all.",
+      },
+    ],
+  },
+  {
+    heading: "Using this site",
+    terms: [
+      {
+        term: "Browsing other days",
+        body: "Use the arrows or the date picker above the Ring to look at any earlier day, back to when this site's records begin.",
+      },
+      {
+        term: "Chart and Table view",
+        body: "The price history section below the Ring can show the same data as a chart or as a sortable table — switch between them with the Chart/Table buttons.",
+      },
+      {
+        term: "Day ahead / Intraday / Both",
+        body: "Filter the chart to just the day ahead line, just the latest intraday line, or both together.",
+      },
+      {
+        term: "Custom date range",
+        body: "Pick Custom instead of Today, 7 day, or All time to set your own start and end date.",
+      },
+      {
+        term: "Exporting to Excel",
+        body: "The Export .xlsx button downloads whatever's currently shown — it always matches the active date range and series filter.",
       },
     ],
   },
