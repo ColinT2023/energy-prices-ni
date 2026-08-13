@@ -21,6 +21,7 @@ import {
   AUCTION_LABEL,
   AUCTION_LABEL_SHORT,
   BAND_EXPLANATION,
+  BAND_LABEL,
   formatPence,
   formatGbp,
 } from "../lib/priceSeries";
@@ -206,7 +207,12 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     const label = periodLabel(dayStart.getTime() + index * 30 * 60000);
     if (!row) return { label, detail: "no data" };
     const provisionalNote = row.provisional ? " · provisional, not yet official" : "";
-    const detail = `${formatPence(row.price_gbp)}p · £${formatGbp(row.price_gbp)}/MWh · ${row.band}${provisionalNote}`;
+    // Lowercased since BAND_LABEL's values (Low/Typical/Peak) are cased
+    // for standalone use (table cells, the legend) — this line is one
+    // continuous lowercase sentence, same as "provisional, not yet
+    // official" right after it.
+    const bandLabel = (BAND_LABEL[row.band] ?? row.band).toLowerCase();
+    const detail = `${formatPence(row.price_gbp)}p · £${formatGbp(row.price_gbp)}/MWh · ${bandLabel}${provisionalNote}`;
     return { label, detail };
   }
 
