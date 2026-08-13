@@ -226,22 +226,27 @@ export default function PriceRing({ provisionalEnabled = false }) {
     </div>
   );
 
-  // Whether each source has any data for the day currently being viewed.
-  // Provisional is fetched for whatever day is selected (see
-  // provisionalRows above), so this dot reflects the real result rather
-  // than an assumption about which days it could apply to — it'll read
-  // green for yesterday too, exactly when the backend's own trailing
-  // window actually has something there.
+  // Plain counts of what's actually rendered for the selected day, not
+  // just whether each source has *any* data — two on/off dots looked
+  // identical whether a day was 46 official + 2 provisional or an even
+  // split, understating how much of a day is actually confirmed in
+  // exactly the direction worth avoiding. Counted from segmentsByIndex
+  // itself, the same map the ring's segments render from, so this always
+  // matches what's on screen rather than what was merely fetched.
+  const sourceCounts = useMemo(() => {
+    let official = 0;
+    let provisional = 0;
+    for (const row of segmentsByIndex.values()) {
+      if (row.provisional) provisional++;
+      else official++;
+    }
+    return { official, provisional };
+  }, [segmentsByIndex]);
+
   const sourceStatus = provisionalEnabled && (
     <div className="source-status">
-      <span className="source-status-item">
-        <span className={`status-dot ${rows.length > 0 ? "status-dot-on" : ""}`} />
-        Official
-      </span>
-      <span className="source-status-item">
-        <span className={`status-dot ${provisionalRows.length > 0 ? "status-dot-on" : ""}`} />
-        Provisional
-      </span>
+      {sourceCounts.official} official
+      {sourceCounts.provisional > 0 ? ` · ${sourceCounts.provisional} provisional` : ""}
     </div>
   );
 

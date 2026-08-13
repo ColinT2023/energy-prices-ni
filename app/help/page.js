@@ -82,7 +82,7 @@ const SECTIONS = [
       },
       {
         term: "How to tell it apart",
-        body: "A dashed, dimmer segment on the Ring, a dashed line on the chart, and a “provisional” note wherever a price appears — never blended into a confirmed figure without that marking. The status dots next to the Ring's date picker show whether each source currently has data for the day you're viewing.",
+        body: "A dashed, dimmer segment on the Ring, a dashed line on the chart, and a “provisional” note wherever a price appears — never blended into a confirmed figure without that marking. A count next to the Ring's date picker (for example “46 official · 2 provisional”) shows exactly how much of the day you're viewing is confirmed versus not, rather than just whether each source has anything at all.",
       },
     ],
   },
