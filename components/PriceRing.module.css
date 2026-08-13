@@ -104,15 +104,10 @@
   font-size: 44px;
   line-height: 1;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
   gap: 10px;
-}
-
-@media (max-width: 420px) {
-  .price {
-    font-size: 30px;
-  }
 }
 
 .priceDot {
@@ -142,6 +137,43 @@
   color: var(--text-muted);
   margin-top: 10px;
   letter-spacing: 0.04em;
+}
+
+/* Hidden on desktop — shown only in the mobile breakpoint below, in place
+   of .gbpPrice/.unit, as a single condensed line. */
+.mobileSummary {
+  display: none;
+}
+
+/* Mobile-only: the ring itself shrinks a lot on narrow viewports (it stacks
+   under the hero text once .hero wraps), but the centre text's font sizes
+   didn't shrink with it — the 4-line stack ended up taller than the ring's
+   inner hole, pushing the price+dot line up out of true centre and into the
+   arc/label area (read as the dot "floating" away from the price). Desktop
+   is untouched; this only fires below 420px. */
+@media (max-width: 420px) {
+  .price {
+    font-size: 30px;
+  }
+
+  .ringCentre {
+    width: 50%;
+  }
+
+  .gbpPrice,
+  .unit,
+  .period {
+    display: none;
+  }
+
+  .mobileSummary {
+    display: block;
+    font-family: var(--font-mono), monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
 }
 
 .hourLabel {

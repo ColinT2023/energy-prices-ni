@@ -14,7 +14,13 @@ import {
   shiftYmd,
   periodsInLondonDay,
 } from "../lib/londonTime";
-import { latestPerPeriod, mergeWithProvisional, AUCTION_LABEL, BAND_EXPLANATION } from "../lib/priceSeries";
+import {
+  latestPerPeriod,
+  mergeWithProvisional,
+  AUCTION_LABEL,
+  AUCTION_LABEL_SHORT,
+  BAND_EXPLANATION,
+} from "../lib/priceSeries";
 import styles from "./PriceRing.module.css";
 
 // Segment count is *not* a fixed 48: the UK/Ireland clock change days have
@@ -430,6 +436,17 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
                 per kWh{current ? ` · ${AUCTION_LABEL[current.auction] ?? current.auction}` : ""}
                 {current?.provisional ? " · provisional" : ""}
               </div>
+              {current && (
+                // Mobile-only condensed equivalent of the gbpPrice/unit lines
+                // above — hidden on desktop, shown in place of them below
+                // 420px via PriceRing.module.css so the centre stack fits
+                // inside the ring's shrunken inner hole without the price
+                // line getting pushed off-centre.
+                <div className={styles.mobileSummary}>
+                  £{Math.round(current.price_gbp)}/MWh · {AUCTION_LABEL_SHORT[current.auction] ?? current.auction}
+                  {current.provisional ? " · provisional" : ""}
+                </div>
+              )}
               <div className={styles.period} style={{ color: currentColour }}>
                 {periodLabel(dayStart.getTime() + currentIndex * 30 * 60000)} · now
               </div>
