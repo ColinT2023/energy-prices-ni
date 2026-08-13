@@ -279,10 +279,10 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   }, [segmentsByIndex]);
 
   const sourceStatus = provisionalEnabled && (
-    <div className="source-status">
+    <span className="source-status">
       {sourceCounts.official} official
       {sourceCounts.provisional > 0 ? ` · ${sourceCounts.provisional} provisional` : ""}
-    </div>
+    </span>
   );
 
   // Plain absolute anchor alongside the ring's relative (this-day-vs-its-
@@ -297,8 +297,23 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   // with what the ring itself is showing for this day.
   const dailyAverage = useMemo(() => aggregateDaily([...segmentsByIndex.values()])[0], [segmentsByIndex]);
   const dailyAverageStatus = dailyAverage && (
-    <div className="daily-average">
-      Avg {formatPence(dailyAverage.price_gbp)}p (£{formatGbp(dailyAverage.price_gbp)}/MWh)
+    <span className="daily-average">
+      Day average: {formatPence(dailyAverage.price_gbp)}p (£{formatGbp(dailyAverage.price_gbp)}/MWh)
+    </span>
+  );
+
+  // Rendered as one combined line, not two stacked ones — both are
+  // day-level metadata (this day's coverage, this day's average), and
+  // keeping them together is what stops the average from reading as a
+  // second line of the big current-period price sitting right below it
+  // in the ring's centre, especially with the toggle off (the default),
+  // where the average would otherwise be the only thing sitting directly
+  // above the ring with nothing else to visually group it with.
+  const dayStatusLine = (dailyAverageStatus || sourceStatus) && (
+    <div className="day-status-line">
+      {dailyAverageStatus}
+      {dailyAverageStatus && sourceStatus ? " · " : null}
+      {sourceStatus}
     </div>
   );
 
@@ -306,8 +321,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     return (
       <div className={styles.ringCol}>
         {dayNav}
-        {dailyAverageStatus}
-        {sourceStatus}
+        {dayStatusLine}
         <div className={styles.ringWrap}>
           <div className={styles.emptyState}>
             <p role="alert">Couldn&apos;t load prices: {error}</p>
@@ -336,8 +350,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     return (
       <div className={styles.ringCol}>
         {dayNav}
-        {dailyAverageStatus}
-        {sourceStatus}
+        {dayStatusLine}
         <div className={styles.ringWrap}>
           <div className={styles.emptyState}>
             {canOfferProvisional ? (
@@ -360,8 +373,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   return (
     <div className={styles.ringCol}>
       {dayNav}
-      {dailyAverageStatus}
-      {sourceStatus}
+      {dayStatusLine}
       <div className={styles.ringWrap}>
         <svg viewBox="0 0 380 380" width="100%" height="100%">
           {Array.from({ length: periods }, (_, i) => {

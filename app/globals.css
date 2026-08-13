@@ -199,23 +199,29 @@ h1 {
   font-style: italic;
 }
 
+/* Both day-level metadata, rendered together on one line (.day-status-line
+   below) rather than stacked — a plain absolute anchor (the day's actual
+   average — the ring's colours are relative to each day's own trailing
+   7-day window, so two days can look like the same colour pattern while
+   sitting at very different real price levels) sitting alone directly
+   above the ring read too easily as a second line of the big
+   current-period price in the ring's centre, especially with the
+   provisional toggle off (the default), when it had nothing else nearby
+   to visually group it with instead. */
+.day-status-line {
+  margin-top: 10px;
+}
+
 .source-status {
   font-family: var(--font-mono), monospace;
   font-size: 11px;
   color: var(--text-muted);
-  margin-top: 10px;
 }
 
-/* Absolute anchor next to the Ring's date picker — the ring's colours
-   are relative to each day's own trailing 7-day window, so two days can
-   look like the same colour pattern while sitting at very different
-   real price levels. This is the plain "was this day actually cheap or
-   expensive" figure that the colours alone can't answer. */
 .daily-average {
   font-family: var(--font-mono), monospace;
   font-size: 11px;
   color: var(--text);
-  margin-top: 10px;
 }
 
 .legend {
