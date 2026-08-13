@@ -197,7 +197,21 @@
   font-family: var(--font-mono), monospace;
   font-size: 11px;
   color: var(--text);
-  white-space: nowrap;
+  /* Not nowrap: the detail line ("18.9p · £189/MWh · peak · provisional,
+     not yet official") can run past 200px in its longest form, and this
+     ring can be as narrow as ~200px on mobile — capping the width and
+     letting that one line wrap keeps the box a predictable size instead
+     of growing to whatever its longest possible content needs, which is
+     what the left/right clamp below assumes when picking its margins. */
+  white-space: normal;
+  max-width: 200px;
+  text-align: center;
   pointer-events: none;
   z-index: 1;
+}
+
+.tooltipPeriod {
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  white-space: nowrap;
 }

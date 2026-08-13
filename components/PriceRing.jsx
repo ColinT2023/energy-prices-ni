@@ -205,11 +205,21 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   const [activeIndex, setActiveIndex] = useState(null);
   const [infoOpen, setInfoOpen] = useState(false);
 
-  function segmentTooltip(index, row) {
+  // £/MWh comes from the raw price_gbp, not derived back from the rounded
+  // pence figure — same rounding-error avoidance as the chart tooltip.
+  function segmentTooltipParts(index, row) {
     const label = periodLabel(dayStart.getTime() + index * 30 * 60000);
-    if (!row) return `${label} · no data`;
+    if (!row) return { label, detail: "no data" };
     const provisionalNote = row.provisional ? " · provisional, not yet official" : "";
-    return `${label} · ${gbpToPence(row.price_gbp).toFixed(1)}p · ${row.band}${provisionalNote}`;
+    const detail = `${gbpToPence(row.price_gbp).toFixed(1)}p · £${Math.round(row.price_gbp)}/MWh · ${row.band}${provisionalNote}`;
+    return { label, detail };
+  }
+
+  // Single-string form for aria-label — screen readers don't need the
+  // visual two-line split, just the same information in one label.
+  function segmentTooltip(index, row) {
+    const { label, detail } = segmentTooltipParts(index, row);
+    return `${label} · ${detail}`;
   }
 
   const canGoPrevious = !earliestDate || selectedDate > earliestDate;
@@ -469,19 +479,34 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
           )}
         </div>
 
-        {activeIndex != null && (
-          <div
-            className={styles.tooltip}
-            role="tooltip"
-            style={(() => {
-              const midAngle = (360 / periods) * (activeIndex + 0.5) - 90;
-              const pos = polarToCartesian(CENTRE, CENTRE, OUTER_R + 46, midAngle);
-              return { left: `${(pos.x / 380) * 100}%`, top: `${(pos.y / 380) * 100}%` };
-            })()}
-          >
-            {segmentTooltip(activeIndex, segmentsByIndex.get(activeIndex))}
-          </div>
-        )}
+        {activeIndex != null &&
+          (() => {
+            const midAngle = (360 / periods) * (activeIndex + 0.5) - 90;
+            const pos = polarToCartesian(CENTRE, CENTRE, OUTER_R + 46, midAngle);
+            const { label, detail } = segmentTooltipParts(activeIndex, segmentsByIndex.get(activeIndex));
+            return (
+              <div
+                className={styles.tooltip}
+                role="tooltip"
+                style={{
+                  // Clamped the same way as the chart tooltip fix — the
+                  // ring wraps all the way around, so unlike the chart
+                  // (only a left-edge risk) this can slide past any of
+                  // the four edges depending on which segment's hovered,
+                  // not just the left one.
+                  left: `clamp(100px, ${(pos.x / 380) * 100}%, calc(100% - 100px))`,
+                  // Tall enough for the worst case: the detail line wraps
+                  // to a second row when it's both provisional and long
+                  // (e.g. "· provisional, not yet official"), making the
+                  // box up to ~116px tall — measured directly, not guessed.
+                  top: `clamp(62px, ${(pos.y / 380) * 100}%, calc(100% - 62px))`,
+                }}
+              >
+                <div className={styles.tooltipPeriod}>{label}</div>
+                <div>{detail}</div>
+              </div>
+            );
+          })()}
       </div>
 
       <div className="legend">
