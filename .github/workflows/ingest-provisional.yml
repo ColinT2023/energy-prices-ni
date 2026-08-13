@@ -1,13 +1,19 @@
 name: Ingest NI provisional prices
 
 on:
-  # A much smaller payload than the main pipeline (a handful of pending
-  # reports at most, one small JSON request each) — safe to run more
-  # frequently, which is the point: this exists specifically to close the
-  # "today shows nothing yet" gap sooner than the main pipeline's own
-  # cadence could.
+  # Matches the main pipeline's interval, not tighter — GitHub Actions
+  # bills each job run rounded up to a minimum of 1 minute regardless of
+  # actual duration, so trigger *count* is what drives cost, not how fast
+  # a run finishes. */5 (288 possible runs/day) would cost real money on
+  # its own even with every run being an instant no-op; */15 keeps this
+  # workflow's ceiling roughly in line with the main pipeline's. The
+  # coverage-skip check (today_fully_covered, see ingest_provisional.py)
+  # stays regardless of interval — it's still doing real work protecting
+  # the undocumented endpoint from unnecessary hits and keeping actual
+  # poll work minimal whenever a run isn't skipped, independent of the
+  # billing-floor issue this interval change addresses.
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 jobs:
