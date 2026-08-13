@@ -20,6 +20,8 @@ import {
   AUCTION_LABEL,
   AUCTION_LABEL_SHORT,
   BAND_EXPLANATION,
+  formatPence,
+  formatGbp,
 } from "../lib/priceSeries";
 import styles from "./PriceRing.module.css";
 
@@ -77,12 +79,6 @@ function describeArc(cx, cy, rOuter, rInner, startAngle, endAngle) {
 
 function periodLabel(startMs) {
   return `${formatLondonTime(startMs)}–${formatLondonTime(startMs + 30 * 60000)}`;
-}
-
-function gbpToPence(priceGbp) {
-  // price_gbp is £/MWh (wholesale); the site displays p/kWh (retail-scale).
-  // 1 MWh = 1000 kWh, so £/MWh -> p/kWh is a straight divide by 10.
-  return priceGbp / 10;
 }
 
 /**
@@ -205,13 +201,11 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   const [activeIndex, setActiveIndex] = useState(null);
   const [infoOpen, setInfoOpen] = useState(false);
 
-  // £/MWh comes from the raw price_gbp, not derived back from the rounded
-  // pence figure — same rounding-error avoidance as the chart tooltip.
   function segmentTooltipParts(index, row) {
     const label = periodLabel(dayStart.getTime() + index * 30 * 60000);
     if (!row) return { label, detail: "no data" };
     const provisionalNote = row.provisional ? " · provisional, not yet official" : "";
-    const detail = `${gbpToPence(row.price_gbp).toFixed(1)}p · £${Math.round(row.price_gbp)}/MWh · ${row.band}${provisionalNote}`;
+    const detail = `${formatPence(row.price_gbp)}p · £${formatGbp(row.price_gbp)}/MWh · ${row.band}${provisionalNote}`;
     return { label, detail };
   }
 
@@ -448,7 +442,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
             {isToday ? (
               <>
                 <span className={styles.priceDot} style={{ background: currentColour }} />
-                {current ? `${gbpToPence(current.price_gbp).toFixed(1)}p` : "—"}
+                {current ? `${formatPence(current.price_gbp)}p` : "—"}
               </>
             ) : (
               formatLongDate(selectedDate)
@@ -456,7 +450,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
           </div>
           {isToday && (
             <>
-              {current && <div className={styles.gbpPrice}>£{Math.round(current.price_gbp)}/MWh</div>}
+              {current && <div className={styles.gbpPrice}>£{formatGbp(current.price_gbp)}/MWh</div>}
               <div className={styles.unit}>
                 per kWh{current ? ` · ${AUCTION_LABEL[current.auction] ?? current.auction}` : ""}
                 {current?.provisional ? " · provisional" : ""}
@@ -466,7 +460,11 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
                 // above — hidden on desktop, shown in place of them below
                 // 420px via PriceRing.module.css so the centre stack fits
                 // inside the ring's shrunken inner hole without the price
-                // line getting pushed off-centre.
+                // line getting pushed off-centre. £/MWh stays whole-number
+                // here specifically (unlike everywhere else, which is full
+                // 2dp) — the two extra characters pushed this line from a
+                // tight 2-line fit to 3 on the narrowest widths, undoing
+                // part of what that condensation fix was for.
                 <div className={styles.mobileSummary}>
                   £{Math.round(current.price_gbp)}/MWh · {AUCTION_LABEL_SHORT[current.auction] ?? current.auction}
                   {current.provisional ? " · provisional" : ""}

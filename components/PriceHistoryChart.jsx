@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { aggregateDaily, dayAheadSeries, latestIntradaySeries, WIDE_RANGE_DAYS } from "../lib/priceSeries";
+import {
+  aggregateDaily,
+  dayAheadSeries,
+  latestIntradaySeries,
+  WIDE_RANGE_DAYS,
+  gbpToPence,
+  formatPence,
+  formatGbp,
+} from "../lib/priceSeries";
 import { formatLondonTime, formatLondonDateTime, formatLongDate, londonYmd } from "../lib/londonTime";
 
 // SVG stop-color doesn't reliably resolve CSS custom properties across
@@ -13,10 +21,6 @@ const VIEW_W = 800;
 const VIEW_H = 200;
 const PAD_Y = 10;
 const GRIDLINE_FRACTIONS = [0.25, 0.5, 0.75];
-
-function gbpToPence(priceGbp) {
-  return priceGbp / 10;
-}
 
 function toPoints(rows) {
   return rows.map((row) => ({
@@ -152,12 +156,12 @@ function tooltipText(point, isAggregated) {
   const suffix = isAggregated ? " avg" : "";
   if (point.dayAhead != null) {
     parts.push(
-      `day ahead ${point.dayAhead.toFixed(1)}p · £${Math.round(point.dayAheadGbp)}/MWh${suffix}${point.dayAheadProvisional ? " (provisional)" : ""}`
+      `day ahead ${formatPence(point.dayAheadGbp)}p · £${formatGbp(point.dayAheadGbp)}/MWh${suffix}${point.dayAheadProvisional ? " (provisional)" : ""}`
     );
   }
   if (point.intraday != null) {
     parts.push(
-      `intraday ${point.intraday.toFixed(1)}p · £${Math.round(point.intradayGbp)}/MWh${suffix}${point.intradayProvisional ? " (provisional)" : ""}`
+      `intraday ${formatPence(point.intradayGbp)}p · £${formatGbp(point.intradayGbp)}/MWh${suffix}${point.intradayProvisional ? " (provisional)" : ""}`
     );
   }
   return parts.join(" · ");
@@ -336,7 +340,7 @@ export default function PriceHistoryChart({
               {activePoint.dayAhead != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--text)" }} />
-                  Day ahead {activePoint.dayAhead.toFixed(1)}p · £{Math.round(activePoint.dayAheadGbp)}/MWh
+                  Day ahead {formatPence(activePoint.dayAheadGbp)}p · £{formatGbp(activePoint.dayAheadGbp)}/MWh
                   {isAggregated ? " avg" : ""}
                   {activePoint.dayAheadProvisional ? " · provisional" : ""}
                 </div>
@@ -344,7 +348,7 @@ export default function PriceHistoryChart({
               {activePoint.intraday != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--average)" }} />
-                  Intraday {activePoint.intraday.toFixed(1)}p · £{Math.round(activePoint.intradayGbp)}/MWh
+                  Intraday {formatPence(activePoint.intradayGbp)}p · £{formatGbp(activePoint.intradayGbp)}/MWh
                   {isAggregated ? " avg" : ""}
                   {activePoint.intradayProvisional ? " · provisional" : ""}
                 </div>

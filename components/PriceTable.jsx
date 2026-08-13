@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatLondonDateTime } from "../lib/londonTime";
-import { AUCTION_LABEL } from "../lib/priceSeries";
+import { AUCTION_LABEL, gbpToPence, formatPence, formatGbp } from "../lib/priceSeries";
 
 const BAND_LABEL = { low: "Low", average: "Average", peak: "Peak" };
 const BAND_COLOUR = { low: "var(--low)", average: "var(--average)", peak: "var(--peak)" };
@@ -24,10 +24,6 @@ const BASE_COLUMNS = [
   { key: "band", label: "Band" },
 ];
 const STATUS_COLUMN = { key: "status", label: "Status" };
-
-function gbpToPence(priceGbp) {
-  return priceGbp / 10;
-}
 
 /**
  * Sortable table over the same scoped rows as the chart — one row per
@@ -104,8 +100,8 @@ export default function PriceTable({ rows }) {
             <tr key={`${row.datetime}-${row.market}`}>
               <td>{formatLondonDateTime(row.datetime)}</td>
               <td>{AUCTION_LABEL[row.auction] ?? row.auction}</td>
-              <td>{row.pence.toFixed(1)}</td>
-              <td>{Number(row.price_gbp).toFixed(2)}</td>
+              <td>{formatPence(row.price_gbp)}</td>
+              <td>{formatGbp(row.price_gbp)}</td>
               <td>
                 <span className="band-dot" style={{ background: BAND_COLOUR[row.band] }} />
                 {BAND_LABEL[row.band] ?? row.band}
