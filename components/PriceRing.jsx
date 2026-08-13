@@ -478,35 +478,6 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
             </>
           )}
         </div>
-
-        {activeIndex != null &&
-          (() => {
-            const midAngle = (360 / periods) * (activeIndex + 0.5) - 90;
-            const pos = polarToCartesian(CENTRE, CENTRE, OUTER_R + 46, midAngle);
-            const { label, detail } = segmentTooltipParts(activeIndex, segmentsByIndex.get(activeIndex));
-            return (
-              <div
-                className={styles.tooltip}
-                role="tooltip"
-                style={{
-                  // Clamped the same way as the chart tooltip fix — the
-                  // ring wraps all the way around, so unlike the chart
-                  // (only a left-edge risk) this can slide past any of
-                  // the four edges depending on which segment's hovered,
-                  // not just the left one.
-                  left: `clamp(100px, ${(pos.x / 380) * 100}%, calc(100% - 100px))`,
-                  // Tall enough for the worst case: the detail line wraps
-                  // to a second row when it's both provisional and long
-                  // (e.g. "· provisional, not yet official"), making the
-                  // box up to ~116px tall — measured directly, not guessed.
-                  top: `clamp(62px, ${(pos.y / 380) * 100}%, calc(100% - 62px))`,
-                }}
-              >
-                <div className={styles.tooltipPeriod}>{label}</div>
-                <div>{detail}</div>
-              </div>
-            );
-          })()}
       </div>
 
       <div className="legend">
@@ -541,6 +512,27 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
           )}
         </span>
       </div>
+
+      {(() => {
+        // Fixed-position readout, not a floating box that follows the
+        // hovered segment — hover and keyboard focus both drive the same
+        // activeIndex, so both update this the same way. Falls back to
+        // the "now" segment when nothing's hovered/focused (today only —
+        // a past day has no "now" segment, so this is just empty then).
+        const readoutIndex = activeIndex != null ? activeIndex : currentIndex;
+        const parts =
+          readoutIndex != null ? segmentTooltipParts(readoutIndex, segmentsByIndex.get(readoutIndex)) : null;
+        return (
+          <div className={styles.readout}>
+            {parts && (
+              <>
+                <div className={styles.readoutPeriod}>{parts.label}</div>
+                <div>{parts.detail}</div>
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
