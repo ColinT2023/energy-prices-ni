@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 from supabase import create_client
 
 from ni_prices_common import get_new_ea001_reports, pivot_records, price_table_to_rows
-from provisional_common import fetch_ist_document, parse_ist_document, today_fully_covered
+from provisional_common import fetch_ist_document, parse_ist_document, nothing_left_to_poll
 
 
 def enabled():
@@ -46,9 +46,10 @@ def run():
     # Cheap coverage check first, before anything that touches the report
     # list or the IST=1 endpoint — most triggers under a tight schedule
     # should land here and exit immediately, since there's nothing to gain
-    # once every period of today already has a row from somewhere.
-    if today_fully_covered(supabase):
-        print("Today's settlement periods are already fully covered (official + provisional) — nothing to do.")
+    # once today (and yesterday's own trailing periods) already have a row
+    # from somewhere.
+    if nothing_left_to_poll(supabase):
+        print("Today and yesterday's trailing periods are already fully covered (official + provisional) — nothing to do.")
         return
 
     state = supabase.table("ingestion_state").select("last_publish_time").eq("id", 1).single().execute()

@@ -44,25 +44,25 @@ def london_today_bounds(now_utc=None):
     return day_start_utc, day_end_utc, expected_periods
 
 
-def today_fully_covered(supabase):
-    """
-    True if every settlement period of today (London) already has at
-    least one row across ni_prices and ni_prices_provisional combined —
-    doesn't matter which auction or which table it came from, only that
-    a row exists. Filling gaps is this job's entire purpose; keeping an
-    already-covered period's provisional value fresher against a later
-    auction revision is not something it tries to do, so once every
-    period has *a* row, there's nothing left to gain by polling further
-    until tomorrow's periods start needing coverage.
+# How many of yesterday's trailing periods to also check, alongside all of
+# today. The main pipeline's own watermark can lag by a period or two even
+# once a day has technically ended (the same trailing-edge pattern seen
+# repeatedly with the official pipeline this session) — a day "finishing"
+# doesn't guarantee its last periods actually got covered before it did.
+# Confirmed directly against the live IST=1 endpoint that it still returns
+# real values for periods whose delivery date has already passed (not
+# scoped to in-flight/near-term auctions only), so there's a real gap here
+# worth covering. Deliberately small and fixed, not a general lookback —
+# this is specifically the trailing-edge gap, not a mechanism for reaching
+# further back into history.
+TRAILING_PERIODS_FROM_YESTERDAY = 4
 
-    Two small `select datetime` queries — this exists specifically so a
-    run can decide "nothing to do" without ever touching the report list
-    or the IST=1 endpoint, so it stays cheap regardless of how tight the
-    schedule interval is.
-    """
-    day_start_utc, day_end_utc, expected_periods = london_today_bounds()
-    start_iso = day_start_utc.isoformat()
-    end_iso = day_end_utc.isoformat()
+
+def _periods_covered(supabase, start_utc, end_utc):
+    """Count of distinct settlement periods with at least one row, across
+    ni_prices and ni_prices_provisional combined, in [start_utc, end_utc)."""
+    start_iso = start_utc.isoformat()
+    end_iso = end_utc.isoformat()
 
     official = (
         supabase.table("ni_prices")
@@ -78,9 +78,36 @@ def today_fully_covered(supabase):
         .lt("datetime", end_iso)
         .execute()
     )
+    return len({row["datetime"] for row in official.data} | {row["datetime"] for row in provisional.data})
 
-    covered = {row["datetime"] for row in official.data} | {row["datetime"] for row in provisional.data}
-    return len(covered) >= expected_periods
+
+def nothing_left_to_poll(supabase):
+    """
+    True if there's nothing this job could usefully add right now: every
+    period of today (London) already has a row from somewhere, *and* so
+    do the last TRAILING_PERIODS_FROM_YESTERDAY periods of yesterday.
+    Doesn't matter which auction or which table a period's row came from,
+    only that one exists — filling gaps is this job's entire purpose,
+    keeping an already-covered period's value fresher against a later
+    auction revision is not something it tries to do.
+
+    Four small `select datetime` queries — this exists specifically so a
+    run can decide "nothing to do" without ever touching the report list
+    or the IST=1 endpoint, so it stays cheap regardless of how tight the
+    schedule interval is. (The report-fetching in ingest_provisional.py
+    itself needs no matching change: it's driven by the official
+    pipeline's watermark, not by date, so it already picks up yesterday's
+    trailing-period reports whenever it does run — confirmed directly,
+    that's exactly how Aug 12's trailing periods ended up provisionally
+    covered already.)
+    """
+    today_start, today_end, today_periods = london_today_bounds()
+    yesterday_trailing_start = today_start - timedelta(minutes=30 * TRAILING_PERIODS_FROM_YESTERDAY)
+
+    return (
+        _periods_covered(supabase, today_start, today_end) >= today_periods
+        and _periods_covered(supabase, yesterday_trailing_start, today_start) >= TRAILING_PERIODS_FROM_YESTERDAY
+    )
 
 
 def fetch_ist_document(doc_id, timeout=30):
