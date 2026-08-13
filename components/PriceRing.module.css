@@ -193,10 +193,19 @@
      a block that can't move can't slide off an edge or need to avoid
      covering anything. Text wraps at the container's own edge by
      default, so the longest case (provisional + full note) just takes
-     an extra line rather than needing a width cap to force that. */
+     an extra line rather than needing a width cap to force that.
+     Fixed height, not min-height: a minimum only stops the box
+     collapsing when empty, it doesn't stop it *growing* when a longer
+     string (e.g. the provisional note) wraps onto an extra line versus
+     a short official one — that growth is what was pushing everything
+     below (legend, toggle, Price History section) up and down as hover
+     moved between segments. 60px is the measured worst case across all
+     48 segments at this width (430px, "average" band + provisional,
+     wrapping to 2 lines) — see the mobile override below for the
+     narrower, tighter-wrapping case. */
   width: 100%;
   max-width: 430px;
-  min-height: 46px;
+  height: 60px;
   box-sizing: border-box;
   background: var(--bg-raised);
   border: 1px solid var(--line);
@@ -211,4 +220,18 @@
 .readoutPeriod {
   color: var(--text-muted);
   margin-bottom: 4px;
+}
+
+/* Narrower container wraps the same worst-case content one line further
+   than the 430px desktop case above — measured 74px at iPhone SE's
+   206px-wide readout (the narrowest width tested), vs 60px at 430px.
+   Placed after the base .readout rule deliberately: a mobile override
+   declared earlier in the file (as in the .price/.ringCentre block
+   above) loses to a same-specificity rule that comes later in the
+   cascade even when its own media query doesn't match — this one has
+   to come after .readout's base rule to actually apply here. */
+@media (max-width: 420px) {
+  .readout {
+    height: 74px;
+  }
 }
