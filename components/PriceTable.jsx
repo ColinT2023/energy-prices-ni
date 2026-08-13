@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { formatLondonDateTime } from "../lib/londonTime";
 import { AUCTION_LABEL, gbpToPence, formatPence, formatGbp } from "../lib/priceSeries";
 
-const BAND_LABEL = { low: "Low", average: "Average", peak: "Peak" };
+const BAND_LABEL = { low: "Low", average: "Typical", peak: "Peak" };
 const BAND_COLOUR = { low: "var(--low)", average: "var(--average)", peak: "var(--peak)" };
 
 const BASE_COLUMNS = [

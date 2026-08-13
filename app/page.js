@@ -29,7 +29,7 @@ export default function HomePage() {
             Each segment is one half hourly settlement period. Use the arrows
             or date picker above the ring to browse other days &mdash; the
             lit, pulsing segment only appears on today. See the info icon
-            next to the legend for how low, average, and peak are worked out.
+            next to the legend for how low, typical, and peak are worked out.
           </p>
         </div>
       </div>

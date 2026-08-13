@@ -64,7 +64,7 @@ const SECTIONS = [
     ],
   },
   {
-    heading: "Low, average, and peak",
+    heading: "Low, typical, and peak",
     intro: BAND_EXPLANATION,
     terms: [],
   },

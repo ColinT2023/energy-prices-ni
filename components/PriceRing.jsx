@@ -518,7 +518,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
         </div>
         <div className="legend-item">
           <span className="swatch" style={{ background: "var(--average)" }} />
-          Average
+          Typical
         </div>
         <div className="legend-item">
           <span className="swatch" style={{ background: "var(--peak)" }} />
@@ -528,7 +528,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
           <button
             type="button"
             className="info-button"
-            aria-label="How low, average, and peak are worked out"
+            aria-label="How low, typical, and peak are worked out"
             onMouseEnter={() => setInfoOpen(true)}
             onMouseLeave={() => setInfoOpen(false)}
             onFocus={() => setInfoOpen(true)}
