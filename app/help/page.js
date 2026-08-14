@@ -108,8 +108,8 @@ const SECTIONS = [
         body: "The price history section below the Ring can show the same data as a chart or as a sortable table — switch between them with the Chart/Table buttons.",
       },
       {
-        term: "Day ahead / Intraday / Both",
-        body: "Filter the chart to just the day ahead line, just the latest intraday line, or both together.",
+        term: "Intraday / Tomorrow / Both",
+        body: "Chart-only, and only available while viewing Today: Intraday shows today's actual prices, Tomorrow shows tomorrow's day-ahead price on its own, and Both overlays the two so they can be compared hour by hour. Outside Today, only Intraday applies, since Tomorrow and Both are both about comparing against tomorrow's date specifically.",
       },
       {
         term: "Custom date range",
@@ -117,7 +117,7 @@ const SECTIONS = [
       },
       {
         term: "Exporting to Excel",
-        body: "The Export .xlsx button downloads whatever's currently shown — it always matches the active date range and series filter.",
+        body: "The Export .xlsx button downloads whatever's currently shown in the table — every auction's row for the active date range — regardless of which chart series is selected.",
       },
     ],
   },

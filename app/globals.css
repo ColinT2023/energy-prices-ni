@@ -498,6 +498,27 @@ h1 {
   margin-right: 6px;
 }
 
+/* The Both series' tooltip carries two full value rows ("Tomorrow (day
+   ahead) 12.21p..." / "Today · Intraday 2 · 12.24p...") — wide enough on
+   its own to overflow the chart's own plot area on a narrow viewport
+   (itself narrower than the viewport, thanks to the page's own margins),
+   not just the viewport itself. Capped relative to the plot (its actual
+   offset parent — see .chart-plot's position: relative) rather than
+   100vw, and left to wrap, so it can never end up wider than the box
+   it's positioned inside of however it ends up anchored. Placed after
+   the base .chart-tooltip rule above (not reusing the earlier
+   max-width:480px block further up the file) — same specificity, so
+   source order decides the winner, and this needs to win over that
+   rule's white-space: nowrap. */
+@media (max-width: 480px) {
+  .chart-tooltip {
+    width: max-content;
+    min-width: min(220px, calc(100% - 16px));
+    max-width: calc(100% - 16px);
+    white-space: normal;
+  }
+}
+
 .auction-key {
   display: flex;
   gap: 20px;

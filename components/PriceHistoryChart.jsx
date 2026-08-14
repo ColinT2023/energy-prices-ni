@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDataCoverage } from "../hooks/useDataCoverage";
 import {
   aggregateDaily,
@@ -12,12 +12,14 @@ import {
   formatGbp,
   AUCTION_LABEL,
 } from "../lib/priceSeries";
+import { TOMORROW_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import {
   formatLondonTime,
   formatLondonDateTime,
   formatLongDate,
   londonYmd,
   londonMidnightUtc,
+  minutesSinceLondonMidnight,
   daySpanCount,
 } from "../lib/londonTime";
 
@@ -46,12 +48,35 @@ function toPoints(rows) {
   }));
 }
 
-function buildScales(points) {
+/** Same shape as toPoints, but `t` is minutes since that row's own
+ * London-local midnight rather than an absolute timestamp — used only by
+ * the Both chart series, which overlays today's actual prices against
+ * tomorrow's day-ahead prices and needs both series to land on the same
+ * x-position for the same time of day, not on two different, non-
+ * overlapping calendar days. */
+function toTimeOfDayPoints(rows) {
+  return rows.map((row) => ({
+    t: minutesSinceLondonMidnight(row.datetime),
+    price: gbpToPence(row.price_gbp),
+    priceGbp: row.price_gbp,
+    band: row.band,
+    provisional: !!row.provisional,
+    auction: row.auction,
+  }));
+}
+
+/** `xDomain` (a fixed [min, max] pair) overrides the data-derived x
+ * extent — used by the Both chart series so its time-of-day axis always
+ * spans the full day (fixed 0-1440 minutes) rather than zooming to
+ * whatever partial data happens to exist yet, which would make the two
+ * overlaid lines' positions shift around as more data arrives. The y
+ * extent always stays data-derived, for both chart series alike. */
+function buildScales(points, xDomain) {
   if (points.length === 0) return null;
   const xs = points.map((p) => p.t);
   const ys = points.map((p) => p.price);
-  const xMin = Math.min(...xs);
-  const xMax = Math.max(...xs);
+  const xMin = xDomain ? xDomain[0] : Math.min(...xs);
+  const xMax = xDomain ? xDomain[1] : Math.max(...xs);
   const yMin = Math.min(...ys);
   const yMax = Math.max(...ys);
   const xRange = xMax - xMin || 1;
@@ -208,6 +233,36 @@ function buildAggregatedTicks(minT, maxT) {
   return ticks;
 }
 
+/** "14:00–14:30" from a raw minutes-since-midnight value — plain clock
+ * arithmetic rather than routing through Intl/Date, since these values
+ * are already time-of-day (not tied to any specific calendar date, so
+ * there's no real instant to format) and can run past 1440 on the
+ * 25-hour clocks-back day, which is still correct to display as e.g.
+ * "24:30", not an error to guard against. */
+function timeOfDayLabel(minutes) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const fmt = (m) => `${pad(Math.floor(m / 60))}:${pad(Math.round(m % 60))}`;
+  return `${fmt(minutes)}–${fmt(minutes + 30)}`;
+}
+
+// Same 3-hour cadence as the Ring's own major hour ticks — fixed, not
+// data-derived, since the Both series' x-axis always spans the full
+// 0-1440 minute domain regardless of how much of the day either line
+// actually has data for yet (see buildScales' xDomain override).
+const TIME_OF_DAY_TICK_MINUTES = [0, 180, 360, 540, 720, 900, 1080, 1260];
+
+/** Fixed ticks at 00:00/03:00/.../21:00 for the Both series' time-of-day
+ * axis — never day-boundary or year-bearing ticks, since the whole point
+ * of this axis is one normalized day with no calendar date attached. */
+function buildTimeOfDayTicks() {
+  return TIME_OF_DAY_TICK_MINUTES.map((m) => ({
+    t: m,
+    isDayBoundary: false,
+    hasYear: false,
+    label: `${String(m / 60).padStart(2, "0")}:00`,
+  }));
+}
+
 /** Inverse of scales.y at a given gridline fraction of the chart's height. */
 function priceAtGridline(scales, fraction) {
   const y = VIEW_H * fraction;
@@ -325,12 +380,15 @@ function pointLabel(t, isAggregated) {
   return isAggregated ? dayLabel(t) : periodLabel(t);
 }
 
+// The day-ahead slot only ever holds tomorrow's price now (see the
+// component docstring) — there's no other scope/series combination left
+// that populates it, so this wording doesn't need to branch on mode.
 function tooltipText(point, isAggregated) {
   const parts = [pointLabel(point.t, isAggregated)];
   const suffix = isAggregated ? " avg" : "";
   if (point.dayAhead != null) {
     parts.push(
-      `day ahead ${formatPence(point.dayAheadGbp)}p · £${formatGbp(point.dayAheadGbp)}/MWh${suffix}${point.dayAheadProvisional ? " (provisional)" : ""}`
+      `tomorrow (day ahead) ${formatPence(point.dayAheadGbp)}p · £${formatGbp(point.dayAheadGbp)}/MWh${suffix}${point.dayAheadProvisional ? " (provisional)" : ""}`
     );
   }
   if (point.intraday != null) {
@@ -347,59 +405,106 @@ function tooltipText(point, isAggregated) {
   return parts.join(" · ");
 }
 
+/** Tooltip text for the Both series specifically — both values are
+ * explicitly dated ("today"/"tomorrow") rather than just naming the
+ * auction type, since the whole point of this mode is overlaying two
+ * different calendar days on one time-of-day axis, where the auction
+ * type alone ("day ahead"/"intraday") wouldn't say which date it's for. */
+function tooltipTextForBoth(point) {
+  const parts = [timeOfDayLabel(point.t)];
+  if (point.dayAhead != null) {
+    parts.push(
+      `tomorrow (day ahead) ${formatPence(point.dayAheadGbp)}p · £${formatGbp(point.dayAheadGbp)}/MWh${point.dayAheadProvisional ? " (provisional)" : ""}`
+    );
+  }
+  if (point.intraday != null) {
+    const label = (point.intradayAuction && AUCTION_LABEL[point.intradayAuction]) || "intraday";
+    parts.push(
+      `today (${label}) ${formatPence(point.intradayGbp)}p · £${formatGbp(point.intradayGbp)}/MWh${point.intradayProvisional ? " (provisional)" : ""}`
+    );
+  }
+  return parts.join(" · ");
+}
+
 /**
  * Price history chart body: a solid neutral day-ahead line plus a latest-
  * intraday line whose stroke gradient follows the real price shape (each
  * point contributes its own band colour as a gradient stop) rather than a
  * fixed decorative gradient, so colour keeps meaning exactly one thing —
- * price level — everywhere on the page. Scope (Today/7 day/All time), the
- * chart/table toggle, and the series toggle (`seriesFilter`: "intraday" |
- * "both" — no standalone "day ahead" option, since Both already carries
- * an unchanged day-ahead line) all live in the parent PriceHistorySection;
- * this component just renders whatever rows it's given, for whichever
- * series are selected.
+ * price level — everywhere on the page. Scope (Today/7 day/All time) and
+ * the chart/table toggle live in the parent PriceHistorySection, as does
+ * `chartSeries` ("intraday" | "tomorrow" | "both") — only ever "intraday"
+ * outside the "today" date range, since Tomorrow/Both compare against
+ * tomorrow's date specifically and that only means something alongside
+ * today's own data.
+ *
+ * `rows` is whatever the active date range fetched; `tomorrowRows` is a
+ * second, independent fetch (tomorrowRange() in lib/priceRange.js) the
+ * parent keeps running any time the date range is "today", so switching
+ * chartSeries between Intraday/Tomorrow/Both is instant rather than
+ * waiting on a fresh request each time.
+ *
+ * "tomorrow" plots dayAheadSeries(tomorrowRows) alone, on the same
+ * absolute-datetime axis every other mode uses — no different from
+ * plotting any other single day. "both" is the one genuinely different
+ * mode: today's rows and tomorrow's rows are for different calendar
+ * dates, so they'd never actually overlap on an absolute timeline (they'd
+ * just sit side by side) — instead both series are re-expressed in
+ * "minutes since their own day's midnight" (toTimeOfDayPoints) and
+ * plotted on a fixed 0-1440 minute axis, so the same x-position always
+ * means the same time of day on both lines and they're genuinely
+ * comparable hour by hour, not just visually adjacent.
  */
 export default function PriceHistoryChart({
   rows,
+  tomorrowRows = [],
+  chartSeries = "intraday",
   emptyMessage = "No data yet for this range.",
-  seriesFilter = "both",
 }) {
-  const showDayAhead = seriesFilter !== "intraday";
-  const showIntraday = seriesFilter !== "dayAhead";
+  const isBoth = chartSeries === "both";
+  const showDayAhead = chartSeries === "tomorrow" || isBoth;
+  const showIntraday = chartSeries === "intraday" || isBoth;
+  // Which rows feed the plain absolute-datetime path (unused when isBoth,
+  // which sources each line from its own row set directly instead).
+  const plotRows = chartSeries === "tomorrow" ? tomorrowRows : rows;
 
   // Plotting every half-hourly row is the point for Today/7 day, but past
   // WIDE_RANGE_DAYS it's mostly noise (and a real render cost at ~29k
   // points for All time) — collapse to one point per day instead. Based
   // on the actual span of what was fetched, not the scope label, so a
-  // wide Custom range gets the same treatment as All time.
+  // wide Custom range gets the same treatment as All time. Both never
+  // aggregates — it's always exactly one normalized day, by construction.
   const isAggregated = useMemo(() => {
-    if (rows.length < 2) return false;
-    const times = rows.map((r) => new Date(r.datetime).getTime());
+    if (isBoth || plotRows.length < 2) return false;
+    const times = plotRows.map((r) => new Date(r.datetime).getTime());
     const spanDays = (Math.max(...times) - Math.min(...times)) / (1000 * 60 * 60 * 24);
     return spanDays > WIDE_RANGE_DAYS;
-  }, [rows]);
+  }, [isBoth, plotRows]);
 
   // Hidden series contribute no points at all (not just an unrendered
   // path) — hiding a line also removes its values from the tooltip and
   // the axis scale, rather than just visually suppressing the stroke.
   const dayAheadPoints = useMemo(() => {
     if (!showDayAhead) return [];
-    const series = dayAheadSeries(rows);
+    if (isBoth) return toTimeOfDayPoints(dayAheadSeries(tomorrowRows));
+    const series = dayAheadSeries(plotRows);
     return toPoints(isAggregated ? aggregateDaily(series) : series);
-  }, [rows, showDayAhead, isAggregated]);
+  }, [isBoth, tomorrowRows, plotRows, showDayAhead, isAggregated]);
   const intradayPoints = useMemo(() => {
     if (!showIntraday) return [];
-    const series = latestIntradaySeries(rows);
+    if (isBoth) return toTimeOfDayPoints(latestIntradaySeries(rows));
+    const series = latestIntradaySeries(plotRows);
     return toPoints(isAggregated ? aggregateDaily(series) : series);
-  }, [rows, showIntraday, isAggregated]);
+  }, [isBoth, rows, plotRows, showIntraday, isAggregated]);
   const scales = useMemo(
-    () => buildScales([...dayAheadPoints, ...intradayPoints]),
-    [dayAheadPoints, intradayPoints]
+    () => buildScales([...dayAheadPoints, ...intradayPoints], isBoth ? [0, 1440] : undefined),
+    [dayAheadPoints, intradayPoints, isBoth]
   );
   const xTicks = useMemo(() => {
     if (!scales) return [];
+    if (isBoth) return buildTimeOfDayTicks();
     return isAggregated ? buildAggregatedTicks(scales.xMin, scales.xMax) : buildSubDayTicks(scales.xMin, scales.xMax);
-  }, [scales, isAggregated]);
+  }, [scales, isAggregated, isBoth]);
   const tooltipPoints = useMemo(
     () => buildTooltipPoints(dayAheadPoints, intradayPoints),
     [dayAheadPoints, intradayPoints]
@@ -426,13 +531,66 @@ export default function PriceHistoryChart({
       ? `Spanning ${dayLabel(new Date(coverageEarliest).getTime())} – ${dayLabel(new Date(coverageLatest).getTime())} (${daySpanCount(coverageEarliest, coverageLatest)} days).`
       : null;
 
+  // "Day ahead" only ever means tomorrow's price now (see the component
+  // docstring) — Both blends in "'s intraday, today" so its own legend
+  // entry reads clearly next to the dated day-ahead one, rather than the
+  // plain "Latest intraday" wording that's fine on its own but ambiguous
+  // once a second, differently-dated line is right next to it.
+  const dayAheadLegendLabel = "Tomorrow (day ahead)";
+  const intradayLegendLabel = isBoth ? "Today's intraday, coloured by price" : "Latest intraday, coloured by price";
+
+  // Both degrades gracefully rather than blocking on either line being
+  // empty individually — the usual "not published yet" cases (today's
+  // intraday hasn't started yet, tomorrow's day-ahead hasn't landed yet)
+  // still render whichever line does have data, exactly like every other
+  // series already does when one of its lines is temporarily absent. Only
+  // when *neither* line has anything does the empty state below apply.
+  const plotEmptyMessage = isBoth
+    ? "Neither today's intraday prices nor tomorrow's day ahead prices have been published yet. This will update automatically as new data arrives."
+    : chartSeries === "tomorrow"
+      ? TOMORROW_NOT_PUBLISHED_MESSAGE
+      : emptyMessage;
+
   const [activeIndex, setActiveIndex] = useState(null);
   const activePoint = activeIndex != null ? tooltipPoints[activeIndex] : null;
+
+  // The tooltip's natural (unclamped) position is a percentage of the
+  // plot's own width, so a fixed pixel margin can't reliably keep it
+  // on-screen — on a narrow viewport the plot itself can be narrower
+  // than the tooltip's rendered width once it's carrying two full value
+  // rows (the Both series), not just one. Measuring the actual rendered
+  // widths after layout and computing an exact safe left position is the
+  // only way this holds at every combination of plot width and tooltip
+  // content — a percentage-only clamp was tuned for one particular
+  // tooltip width and silently stopped covering a wider one.
+  const tooltipRef = useRef(null);
+  const [tooltipLeft, setTooltipLeft] = useState(null);
+  useLayoutEffect(() => {
+    if (!activePoint || !scales || !tooltipRef.current) {
+      setTooltipLeft(null);
+      return;
+    }
+    const el = tooltipRef.current;
+    const container = el.offsetParent;
+    if (!container) return;
+    const containerWidth = container.clientWidth;
+    const tooltipWidth = el.offsetWidth;
+    const rawLeft = (scales.x(activePoint.t) / VIEW_W) * containerWidth;
+    const margin = 4;
+    const halfWidth = tooltipWidth / 2;
+    // If the tooltip is wider than the container even minus margins,
+    // centering it is the best available compromise (it'll touch both
+    // edges rather than clear one of them) — happens only on the very
+    // narrowest devices with the widest (Both) tooltip content.
+    const minLeft = Math.min(halfWidth + margin, containerWidth / 2);
+    const maxLeft = Math.max(containerWidth - halfWidth - margin, containerWidth / 2);
+    setTooltipLeft(Math.min(Math.max(rawLeft, minLeft), maxLeft));
+  }, [activePoint, scales]);
 
   return (
     <div className="chart-box">
       {!scales ? (
-        <p className="placeholder-note">{emptyMessage}</p>
+        <p className="placeholder-note">{plotEmptyMessage}</p>
       ) : (
         <>
         <div className="chart-plot">
@@ -518,7 +676,7 @@ export default function PriceHistoryChart({
                 height={VIEW_H}
                 fill="transparent"
                 tabIndex={0}
-                aria-label={tooltipText(zone, isAggregated)}
+                aria-label={isBoth ? tooltipTextForBoth(zone) : tooltipText(zone, isAggregated)}
                 onMouseEnter={() => setActiveIndex(i)}
                 onMouseLeave={() => setActiveIndex((a) => (a === i ? null : a))}
                 onFocus={() => setActiveIndex(i)}
@@ -537,22 +695,30 @@ export default function PriceHistoryChart({
 
           {activePoint && (
             <div
+              ref={tooltipRef}
               className="chart-tooltip"
               role="tooltip"
               style={{
-                // Clamped so the tooltip can't sit close enough to the
-                // left edge to cover the y-axis price labels there (which
-                // also live at the top of the chart, where the tooltip is
-                // anchored) — plain percentage positioning let that happen
-                // for the first few points.
-                left: `clamp(130px, ${(scales.x(activePoint.t) / VIEW_W) * 100}%, calc(100% - 110px))`,
+                // tooltipLeft is measured post-layout (see the effect
+                // above) from the tooltip's own actual rendered width, so
+                // it's exactly as wide as it needs to be to stay fully
+                // within the plot regardless of content length — a fixed
+                // percentage/pixel clamp was tuned for one tooltip width
+                // and stopped covering Both's wider, two-row content on a
+                // narrow screen. Before that first measurement lands,
+                // falls back to a plain never-quite-at-the-edge estimate
+                // so there's no flash of an unpositioned tooltip.
+                left: tooltipLeft != null ? `${tooltipLeft}px` : `clamp(130px, ${(scales.x(activePoint.t) / VIEW_W) * 100}%, calc(100% - 110px))`,
+                transform: "translateX(-50%)",
               }}
             >
-              <div className="chart-tooltip-period">{pointLabel(activePoint.t, isAggregated)}</div>
+              <div className="chart-tooltip-period">
+                {isBoth ? timeOfDayLabel(activePoint.t) : pointLabel(activePoint.t, isAggregated)}
+              </div>
               {activePoint.dayAhead != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--text)" }} />
-                  Day ahead {formatPence(activePoint.dayAheadGbp)}p · £{formatGbp(activePoint.dayAheadGbp)}/MWh
+                  {dayAheadLegendLabel} {formatPence(activePoint.dayAheadGbp)}p · £{formatGbp(activePoint.dayAheadGbp)}/MWh
                   {isAggregated ? " avg" : ""}
                   {activePoint.dayAheadProvisional ? " · provisional" : ""}
                 </div>
@@ -565,6 +731,7 @@ export default function PriceHistoryChart({
                       along its length, so a static swatch would just be
                       wrong for most points it's shown next to. */}
                   <span className="chart-tooltip-swatch" style={{ background: BAND_HEX[activePoint.intradayBand] }} />
+                  {isBoth ? "Today · " : ""}
                   {intradayDisplayLabel(activePoint.intradayAuction)} · {formatPence(activePoint.intradayGbp)}p · £
                   {formatGbp(activePoint.intradayGbp)}/MWh
                   {isAggregated ? " avg" : ""}
@@ -607,13 +774,13 @@ export default function PriceHistoryChart({
       <div className="auction-key">
         {showDayAhead && (
           <span>
-            <span className="line-sample" /> Day ahead
+            <span className="line-sample" /> {dayAheadLegendLabel}
           </span>
         )}
         {showIntraday && (
           <span>
             <span className="line-sample" style={{ background: "linear-gradient(90deg,#0b7fc3,#faba05,#e72c7a)" }} />
-            Latest intraday, coloured by price
+            {intradayLegendLabel}
           </span>
         )}
         {isAggregated && (

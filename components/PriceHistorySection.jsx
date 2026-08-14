@@ -4,65 +4,49 @@ import { useMemo, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
 import { useDataCoverage } from "../hooks/useDataCoverage";
-import { presetRange, customRange, TODAY_NOT_PUBLISHED_MESSAGE, TOMORROW_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
+import { presetRange, customRange, tomorrowRange, TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
-import { latestIntradaySeries, mergeWithProvisional } from "../lib/priceSeries";
+import { mergeWithProvisional } from "../lib/priceSeries";
 import { londonYmd, formatShortDate, formatLongDate } from "../lib/londonTime";
 import PriceHistoryChart from "./PriceHistoryChart";
 import PriceTable from "./PriceTable";
 
 const SCOPES = [
   { key: "today", label: "Today" },
-  { key: "tomorrow", label: "Tomorrow" },
   { key: "7day", label: "7 day" },
   { key: "full", label: "All time" },
   { key: "custom", label: "Custom" },
 ];
-
-// Intraday auctions only ever run same-day — a future date can never have
-// intraday data, not "not yet", never. "Intraday" alone is disabled for
-// the "tomorrow" scope specifically, forcing "Both" as the only
-// selectable series there — Both still shows a day-ahead-only chart in
-// that case (the intraday line just contributes no points, same
-// graceful-degradation behaviour Both already has whenever intraday
-// simply hasn't published yet for any other reason), so it's the
-// closest equivalent to the isolated day-ahead view a future date can
-// have, without a third "day ahead only" button.
-const TOMORROW_ONLY_SERIES = "both";
-const TOMORROW_DISABLED_SERIES_TITLE = "Not available for Tomorrow — intraday auctions only ever run on the day itself.";
 
 const VIEWS = [
   { key: "chart", label: "Chart" },
   { key: "table", label: "Table" },
 ];
 
-// No standalone "Day ahead" option — Both already carries an unchanged
-// day-ahead reference line, so isolating day ahead alone would only
-// duplicate what Both already shows whenever intraday hasn't repriced a
-// period yet, for one fewer button to scan.
-const SERIES = [
+// Chart-only — Table and the Excel export always show every auction's
+// row for whatever date range is active, unfiltered (see displayRows
+// below), since "overlay two series" is a chart-specific visual idea
+// that doesn't translate to a flat row of data. Tomorrow/Both only mean
+// anything alongside "today": they compare today's actual prices against
+// tomorrow's day-ahead price specifically, not some other range's.
+const CHART_SERIES = [
   { key: "intraday", label: "Intraday" },
+  { key: "tomorrow", label: "Tomorrow" },
   { key: "both", label: "Both" },
 ];
-
-/** Rows for a given series selection — same logic the chart itself uses
- * (latestIntradaySeries), so an export filtered to Intraday matches
- * exactly what that series means on the chart rather than a naive "all
- * rows for that auction" filter. */
-function rowsForSeries(rows, seriesFilter) {
-  if (seriesFilter === "intraday") return latestIntradaySeries(rows);
-  return rows;
-}
+const CHART_SERIES_DISABLED_TITLE =
+  "Only available while viewing Today — Tomorrow and Both compare against tomorrow's date specifically.";
 
 /**
  * The calendar day(s) the currently selected date scope covers, as
- * {startYmd, endYmd} — independent of which auction type (series) is
- * selected, since date range and auction type are separate choices; this
- * feeds the shared "Viewing: ..." indicator, not any one series button.
- * Derived from the same `range` already driving the fetch, rather than a
- * second, independently-reasoned date calculation — "full" is the one
- * exception, since `range.from` there is a sentinel far in the past, not
- * a real date, so it needs the actual coverage bounds instead (the same
+ * {startYmd, endYmd} — independent of chart series, since date range and
+ * chart series are separate choices (even though chart series is itself
+ * now constrained by date range — see CHART_SERIES above); this feeds
+ * the shared "Viewing: ..." indicator, not any one button. Derived from
+ * the same `range` already driving the fetch, rather than a second,
+ * independently-reasoned date calculation — "full" is the one exception,
+ * since `range.from` there is a sentinel far in the past, not a real
+ * date, so it needs the actual coverage bounds instead (the same
  * earliest/latest the chart's own "All time" caption and the Help page
  * already use, not a separate query for the same fact).
  */
@@ -83,12 +67,11 @@ function scopeSpan(scope, range, coverageEarliest, coverageLatest) {
 /**
  * "Viewing: 14 Aug 2026 (Today)" — a single readout of the active date
  * scope, shown once above the whole control area rather than attached to
- * any one series button. Only reacts to scope/range, never to
- * seriesFilter, so it stays visibly true that date and auction type are
- * two independent choices rather than one implying the other. A single
- * day always carries its year (reads as a complete date on its own); a
- * range only adds the year where the two ends actually differ (e.g. an
- * "All time" span crossing a year boundary) rather than on every date.
+ * any one button. Only reacts to scope/range, never to chart series. A
+ * single day always carries its year (reads as a complete date on its
+ * own); a range only adds the year where the two ends actually differ
+ * (e.g. an "All time" span crossing a year boundary) rather than on
+ * every date.
  */
 function viewingLabel(scope, range, coverageEarliest, coverageLatest, scopeLabel) {
   const span = scopeSpan(scope, range, coverageEarliest, coverageLatest);
@@ -104,33 +87,31 @@ function viewingLabel(scope, range, coverageEarliest, coverageLatest, scopeLabel
 }
 
 /**
- * Owns the Today/7 day/All time/Custom scope, the chart/table view
- * switch, and the Intraday/Both series toggle — resolves the scope to a
- * single {from, to} range (lib/priceRange.js), fetches it once via
- * useNiPrices, and hands the rows to whichever view is active. The
- * series toggle applies identically to the chart, the table, and the
- * export — all three derive from the same rowsForSeries(displayRows,
- * seriesFilter) call (the chart via its own seriesFilter prop, table and
- * export via the shared helper below), so switching series can't leave
- * one surface out of sync with what the others show.
+ * Owns the Today/7 day/All time/Custom date range, the chart/table view
+ * switch, and the chart-only Intraday/Tomorrow/Both series — resolves
+ * the date range to a single {from, to} (lib/priceRange.js), fetches it
+ * once via useNiPrices, and hands displayRows to whichever view is
+ * active. Table and the Excel export always get displayRows unfiltered
+ * (every auction's row for the active date range) — chart series has no
+ * effect on either, since overlaying two series is a chart-specific
+ * visual idea.
  *
- * provisionalEnabled (from the page-level toggle) drives the chart, the
- * table, and the export alike — all three read from the same
- * `displayRows`, so there's one merge, not three independent ones that
- * could drift. When the toggle's off, provisionalRows is always empty
- * (see useProvisionalPrices), which makes mergeWithProvisional a no-op —
- * displayRows is then identical in content to `rows`, so every surface
- * behaves exactly as it did before this existed, with no separate
- * "toggle off" code path to keep in sync. Not restricted to any
- * particular scope: provisionalRows is fetched for whatever range is
- * active and merges in wherever it actually has something, since how far
- * back provisional data can reach is the backend's call
- * (nothing_left_to_poll), not a boundary re-derived here.
+ * Whenever the date range is "today", a second, independent range
+ * (tomorrowRange()) is also fetched — not gated on chart series actually
+ * being Tomorrow/Both, so switching between Intraday/Tomorrow/Both is
+ * instant rather than waiting on a fresh request each time. This fetch
+ * simply doesn't run for any other date range, since Tomorrow/Both are
+ * disabled there anyway.
+ *
+ * provisionalEnabled (from the page-level toggle) drives both fetches —
+ * today's range and tomorrow's — the same way, so "today" and "tomorrow"
+ * behave identically with respect to provisional data, not two
+ * independently-reasoned-about toggle behaviours.
  */
 export default function PriceHistorySection({ provisionalEnabled = false }) {
   const [scope, setScope] = useState("today");
   const [view, setView] = useState("chart");
-  const [seriesFilter, setSeriesFilter] = useState("both");
+  const [chartSeries, setChartSeries] = useState("intraday");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
 
@@ -142,6 +123,15 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
   const { rows, error } = useNiPrices(range);
   const provisionalRows = useProvisionalPrices(provisionalEnabled, range);
   const displayRows = useMemo(() => mergeWithProvisional(rows, provisionalRows), [rows, provisionalRows]);
+
+  const tomorrowRangeValue = useMemo(() => (scope === "today" ? tomorrowRange() : null), [scope]);
+  const { rows: tomorrowRows } = useNiPrices(tomorrowRangeValue);
+  const tomorrowProvisionalRows = useProvisionalPrices(provisionalEnabled, tomorrowRangeValue);
+  const tomorrowDisplayRows = useMemo(
+    () => mergeWithProvisional(tomorrowRows, tomorrowProvisionalRows),
+    [tomorrowRows, tomorrowProvisionalRows]
+  );
+
   const [exporting, setExporting] = useState(false);
 
   const { earliest: coverageEarliest, latest: coverageLatest } = useDataCoverage();
@@ -155,7 +145,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
     setExporting(true);
     try {
       const suffix = scope === "custom" ? `${customFrom}-to-${customTo}` : scope;
-      await exportToExcel({ rows: rowsForSeries(displayRows, seriesFilter), filenameSuffix: suffix });
+      await exportToExcel({ rows: displayRows, filenameSuffix: suffix });
     } finally {
       setExporting(false);
     }
@@ -169,7 +159,8 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
       </div>
 
       <p className="controls-explainer">
-        Date range and auction type are independent choices below — changing one never changes the other.
+        Date range and view are independent choices below. Chart series depends on date range too — Tomorrow and Both
+        only apply while viewing Today.
       </p>
 
       <div className="section-controls">
@@ -186,27 +177,29 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
             </button>
           ))}
         </div>
-        <div className="control-group">
-          <span className="control-group-label">Auction type</span>
-          <div className="toggle" role="group" aria-label="Series">
-            {SERIES.map((s) => {
-              const disabled = scope === "tomorrow" && s.key !== TOMORROW_ONLY_SERIES;
-              return (
-                <button
-                  key={s.key}
-                  type="button"
-                  className={s.key === seriesFilter ? "active" : undefined}
-                  aria-pressed={s.key === seriesFilter}
-                  disabled={disabled}
-                  title={disabled ? TOMORROW_DISABLED_SERIES_TITLE : undefined}
-                  onClick={() => setSeriesFilter(s.key)}
-                >
-                  {s.label}
-                </button>
-              );
-            })}
+        {view === "chart" && (
+          <div className="control-group">
+            <span className="control-group-label">Chart series</span>
+            <div className="toggle" role="group" aria-label="Chart series">
+              {CHART_SERIES.map((s) => {
+                const disabled = scope !== "today" && s.key !== "intraday";
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    className={s.key === chartSeries ? "active" : undefined}
+                    aria-pressed={s.key === chartSeries}
+                    disabled={disabled}
+                    title={disabled ? CHART_SERIES_DISABLED_TITLE : undefined}
+                    onClick={() => setChartSeries(s.key)}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
         <div className="control-group">
           <span className="control-group-label">Date range</span>
           <div className="toggle" role="group" aria-label="Date range">
@@ -218,7 +211,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
                 aria-pressed={s.key === scope}
                 onClick={() => {
                   setScope(s.key);
-                  if (s.key === "tomorrow") setSeriesFilter(TOMORROW_ONLY_SERIES);
+                  if (s.key !== "today") setChartSeries("intraday");
                 }}
               >
                 {s.label}
@@ -268,17 +261,12 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
       {view === "chart" ? (
         <PriceHistoryChart
           rows={displayRows}
-          seriesFilter={seriesFilter}
-          emptyMessage={
-            scope === "today"
-              ? TODAY_NOT_PUBLISHED_MESSAGE
-              : scope === "tomorrow"
-                ? TOMORROW_NOT_PUBLISHED_MESSAGE
-                : undefined
-          }
+          tomorrowRows={tomorrowDisplayRows}
+          chartSeries={chartSeries}
+          emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
         />
       ) : (
-        <PriceTable rows={rowsForSeries(displayRows, seriesFilter)} />
+        <PriceTable rows={displayRows} />
       )}
     </div>
   );
