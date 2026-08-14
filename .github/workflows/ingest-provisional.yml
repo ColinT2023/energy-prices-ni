@@ -12,8 +12,18 @@ on:
   # the undocumented endpoint from unnecessary hits and keeping actual
   # poll work minimal whenever a run isn't skipped, independent of the
   # billing-floor issue this interval change addresses.
+  #
+  # Offset 5 minutes from ingest.yml's "*/15 * * * *" (0/15/30/45),
+  # deliberately, not the same slots — measured directly, both workflows
+  # were firing within a minute or two of each other on the same
+  # schedule, and both showing an ~80% dropped/delayed trigger rate.
+  # Doesn't require knowing whether that's account-wide concurrency,
+  # repo-level load, or something else specific to landing at the exact
+  # same instant — staggering removes that overlap regardless of which
+  # it is. Re-measure the actual drop rate after a few hours of real
+  # runs before concluding whether this helped.
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "5,20,35,50 * * * *"
   workflow_dispatch: {}
 
 jobs:
