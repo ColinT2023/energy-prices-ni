@@ -25,6 +25,11 @@ import { dayRange } from "../lib/priceRange";
  * state, so this is accurate even for someone who hasn't turned it on
  * yet: it's telling them there's something there if they want to look,
  * not just echoing a UI choice they already made themselves.
+ *
+ * Both subscriptions reconnect on drop, same pattern as useNiPrices: this
+ * component's entire purpose is telling someone how current the data is,
+ * so it's specifically the one place that must not silently go stale
+ * itself if its channel ever drops.
  */
 export default function DataAsOf() {
   const [latest, setLatest] = useState(null);
@@ -33,6 +38,13 @@ export default function DataAsOf() {
   useEffect(() => {
     if (!supabase) return;
     let cancelled = false;
+    let hasConnectedBefore = false;
+    // Plain closure variables, not useRef — this effect has no
+    // dependencies and only ever runs once per mount (unlike useNiPrices's,
+    // which re-runs on range changes and needs refs to survive that), so
+    // there's no re-render for a ref to persist across.
+    let channel = null;
+    let reconnectTimer = null;
 
     async function fetchLatest() {
       const { data } = await supabase
@@ -45,26 +57,58 @@ export default function DataAsOf() {
 
     fetchLatest();
 
-    // Random suffix so the channel name can never collide across React
-    // StrictMode's dev-mode double-invoke of this effect (see the same
-    // fix in useNiPrices for why a bare Date.now() name once crashed the
-    // page here).
-    const channel = supabase
-      .channel(`data-as-of-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "ni_prices" }, () => {
-        if (!cancelled) fetchLatest();
-      })
-      .subscribe();
+    function openChannel() {
+      if (cancelled) return;
+      // Random suffix so the channel name can never collide across React
+      // StrictMode's dev-mode double-invoke of this effect (see the same
+      // fix in useNiPrices for why a bare Date.now() name once crashed the
+      // page here).
+      channel = supabase
+        .channel(`data-as-of-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "ni_prices" }, () => {
+          if (!cancelled) fetchLatest();
+        })
+        .subscribe((status) => {
+          if (cancelled) return;
+          if (status === "SUBSCRIBED") {
+            clearTimeout(reconnectTimer);
+            // Only re-fetch here on a genuine *re*connect — the very first
+            // SUBSCRIBED fires right after the direct fetchLatest() call
+            // above, so re-fetching then too would just be duplicate work.
+            if (hasConnectedBefore) fetchLatest();
+            hasConnectedBefore = true;
+          } else {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => {
+              if (cancelled) return;
+              if (channel) {
+                supabase.removeChannel(channel);
+                channel = null;
+              }
+              openChannel();
+            }, 5000);
+          }
+        });
+    }
+
+    openChannel();
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      clearTimeout(reconnectTimer);
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
     };
   }, []);
 
   useEffect(() => {
     if (!supabase) return;
     let cancelled = false;
+    let hasConnectedBefore = false;
+    let channel = null;
+    let reconnectTimer = null;
 
     async function checkTodayProvisional() {
       const { from, to } = dayRange(londonYmd(new Date()));
@@ -79,16 +123,42 @@ export default function DataAsOf() {
 
     checkTodayProvisional();
 
-    const channel = supabase
-      .channel(`data-as-of-provisional-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "ni_prices_provisional" }, () => {
-        if (!cancelled) checkTodayProvisional();
-      })
-      .subscribe();
+    function openChannel() {
+      if (cancelled) return;
+      channel = supabase
+        .channel(`data-as-of-provisional-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "ni_prices_provisional" }, () => {
+          if (!cancelled) checkTodayProvisional();
+        })
+        .subscribe((status) => {
+          if (cancelled) return;
+          if (status === "SUBSCRIBED") {
+            clearTimeout(reconnectTimer);
+            if (hasConnectedBefore) checkTodayProvisional();
+            hasConnectedBefore = true;
+          } else {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => {
+              if (cancelled) return;
+              if (channel) {
+                supabase.removeChannel(channel);
+                channel = null;
+              }
+              openChannel();
+            }, 5000);
+          }
+        });
+    }
+
+    openChannel();
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      clearTimeout(reconnectTimer);
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
     };
   }, []);
 
