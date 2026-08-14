@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
@@ -157,6 +157,36 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     () => (provisionalEnabled ? mergeWithProvisional(rows, provisionalRows) : rows),
     [rows, provisionalRows, provisionalEnabled]
   );
+
+  // Distinct settlement periods provisional actually has for the selected
+  // day — computed here so both the auto-reveal effect right below and
+  // the empty-state message further down read the same count, rather
+  // than two separately-reasoned-about tallies of the same fact.
+  const provisionalPeriodCount = useMemo(
+    () => new Set(provisionalRows.map((row) => row.datetime)).size,
+    [provisionalRows]
+  );
+
+  // Auto-reveals provisional data the one time this toggle should default
+  // to on rather than requiring a click: today specifically, with
+  // genuinely nothing confirmed yet but a real (unofficial) price already
+  // available. Fires at most once per mount (autoEnabledRef), not on
+  // every render where the condition still happens to hold — without
+  // that guard, a deliberate manual toggle-off here would just get
+  // forced back on the next re-render, undoing the very choice it's
+  // supposed to respect afterward. `isToday` alone keeps this from ever
+  // applying to any other day reached via the ring's own day navigation,
+  // regardless of that day's own official/provisional mix — official
+  // data for today only ever grows, never retracts, so "zero official"
+  // is a one-time transition, not a state this needs to keep re-checking.
+  const autoEnabledRef = useRef(false);
+  useEffect(() => {
+    if (autoEnabledRef.current) return;
+    if (!isToday || loading || provisionalEnabled) return;
+    if (rows.length > 0 || provisionalPeriodCount === 0) return;
+    autoEnabledRef.current = true;
+    onEnableProvisional?.();
+  }, [isToday, loading, provisionalEnabled, rows, provisionalPeriodCount, onEnableProvisional]);
 
   const dayStart = useMemo(() => londonMidnightUtc(new Date(selectedDate)), [selectedDate]);
   const periods = useMemo(() => periodsInLondonDay(new Date(selectedDate)), [selectedDate]);
@@ -343,12 +373,12 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   // above, so this only triggers when *neither* source has anything for
   // the day. When the toggle's off, though, official can be genuinely
   // empty while provisional (fetched unconditionally, see above) actually
-  // has something — that's the one case with an actionable answer instead
-  // of "check back later": offer to turn the toggle on right here, rather
-  // than expecting someone to separately notice the header text or find
-  // the checkbox themselves.
+  // has something — the auto-reveal effect above already handles that
+  // case for today on its own the moment it's detected, so by the time
+  // this renders it's normally only reachable for a manual toggle-off
+  // (canOfferProvisional still offers the button back, respecting that
+  // choice) or a past day with nothing recorded at all.
   if (!loading && segmentsByIndex.size === 0) {
-    const provisionalPeriodCount = new Set(provisionalRows.map((row) => row.datetime)).size;
     const canOfferProvisional = isToday && !provisionalEnabled && provisionalPeriodCount > 0;
     return (
       <div className={styles.ringCol}>
