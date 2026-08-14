@@ -302,9 +302,17 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   // gaps already applied — not a second calculation that could disagree
   // with what the ring itself is showing for this day.
   const dailyAverage = useMemo(() => aggregateDaily([...segmentsByIndex.values()])[0], [segmentsByIndex]);
+  // periodCount comes straight off the same aggregateDaily call the
+  // average itself is computed from (not re-derived from sourceCounts or
+  // anything else) — so this can't disagree with what was actually
+  // averaged. periods is the day's real period count (46/48/50 across a
+  // clock-change day, see periodsInLondonDay), not a hardcoded 48.
+  // Omitted entirely once coverage is complete, so a full day's line
+  // stays exactly as clean as before this existed.
+  const coverageQualifier = dailyAverage && dailyAverage.periodCount < periods ? `, ${dailyAverage.periodCount} of ${periods} periods` : "";
   const dailyAverageStatus = dailyAverage && (
     <span className="daily-average">
-      Day average: {formatPence(dailyAverage.price_gbp)}p (£{formatGbp(dailyAverage.price_gbp)}/MWh)
+      Day average: {formatPence(dailyAverage.price_gbp)}p (£{formatGbp(dailyAverage.price_gbp)}/MWh{coverageQualifier})
     </span>
   );
 

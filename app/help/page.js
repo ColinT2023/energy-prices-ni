@@ -66,7 +66,12 @@ const SECTIONS = [
   {
     heading: "Low, typical, and peak",
     intro: BAND_EXPLANATION,
-    terms: [],
+    terms: [
+      {
+        term: "Day average",
+        body: "A plain absolute figure next to the Ring's date picker, alongside (not instead of) the low/typical/peak colours above — this day's actual average price, in both units, so a day's colours (relative to its own recent week) can be read against a real number too. The day average only counts periods with a known price, it isn't adjusted or estimated for periods that haven't happened yet.",
+      },
+    ],
   },
   {
     heading: "Provisional prices",
