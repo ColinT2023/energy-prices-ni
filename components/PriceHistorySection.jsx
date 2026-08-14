@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
+import { useDataCoverage } from "../hooks/useDataCoverage";
 import { presetRange, customRange, TODAY_NOT_PUBLISHED_MESSAGE, TOMORROW_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
 import { dayAheadSeries, latestIntradaySeries, mergeWithProvisional } from "../lib/priceSeries";
+import { londonYmd, formatShortDate, formatLongDate } from "../lib/londonTime";
 import PriceHistoryChart from "./PriceHistoryChart";
 import PriceTable from "./PriceTable";
 
@@ -43,6 +45,62 @@ function rowsForSeries(rows, seriesFilter) {
   if (seriesFilter === "dayAhead") return dayAheadSeries(rows);
   if (seriesFilter === "intraday") return latestIntradaySeries(rows);
   return rows;
+}
+
+/** Short-form date for a label — includes the year only when it isn't
+ * the current one, so the common case (this year's data) stays compact
+ * without silently becoming ambiguous for an older Custom-range date. */
+function labelDate(ymd) {
+  const currentYear = londonYmd(new Date()).slice(0, 4);
+  return ymd.slice(0, 4) === currentYear ? formatShortDate(ymd) : formatLongDate(ymd);
+}
+
+/**
+ * The calendar day(s) the day-ahead series in view actually covers, as
+ * {startYmd, endYmd} — the fact "Day ahead" alone doesn't state wherever
+ * it appears, only implies via whichever scope tab happens to be
+ * selected (see the button/chart label below, which spells it out).
+ * Derived from the same `range` already driving the fetch, rather than a
+ * second, independently-reasoned date calculation — "full" is the one
+ * exception, since `range.from` there is a sentinel far in the past, not
+ * a real date, so it needs the actual coverage bounds instead (the same
+ * earliest/latest the chart's own "All time" caption and the Help page
+ * already use, not a separate query for the same fact).
+ */
+function dayAheadSpan(scope, range, coverageEarliest, coverageLatest) {
+  if (scope === "full") {
+    if (!coverageEarliest || !coverageLatest) return null;
+    return { startYmd: londonYmd(new Date(coverageEarliest)), endYmd: londonYmd(new Date(coverageLatest)) };
+  }
+  if (!range) return null;
+  const startYmd = londonYmd(new Date(range.from));
+  // range.to is an exclusive boundary — stepping back a moment lands
+  // within the last calendar day actually included, rather than the one
+  // just past it. Open-ended ranges (7 day) run through "now" instead.
+  const endYmd = range.to ? londonYmd(new Date(new Date(range.to).getTime() - 1)) : londonYmd(new Date());
+  return { startYmd, endYmd };
+}
+
+/**
+ * "Day ahead" alone reads as if it always means "tomorrow's price" — for
+ * a specific delivery date (especially Today, often already in effect by
+ * the time it's viewed), that's a real contradiction someone would
+ * otherwise have to resolve themselves by checking which scope tab is
+ * selected. Names the actual date(s) in view instead, in two lengths:
+ * `button` for the compact series toggle, `chart` for the fuller legend
+ * caption where there's room to spell it out.
+ */
+function dayAheadLabels(scope, range, coverageEarliest, coverageLatest) {
+  const span = dayAheadSpan(scope, range, coverageEarliest, coverageLatest);
+  if (!span) return { button: "Day ahead", chart: "Day ahead" };
+  const { startYmd, endYmd } = span;
+  if (startYmd === endYmd) {
+    const d = labelDate(startYmd);
+    return { button: `Day ahead · ${d}`, chart: `Day ahead price for ${d}` };
+  }
+  const from = labelDate(startYmd);
+  const to = labelDate(endYmd);
+  return { button: `Day ahead · ${from} – ${to}`, chart: `Day ahead price, ${from} – ${to}` };
 }
 
 /**
@@ -85,6 +143,12 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
   const displayRows = useMemo(() => mergeWithProvisional(rows, provisionalRows), [rows, provisionalRows]);
   const [exporting, setExporting] = useState(false);
 
+  const { earliest: coverageEarliest, latest: coverageLatest } = useDataCoverage();
+  const { button: dayAheadButtonLabel, chart: dayAheadChartLabel } = useMemo(
+    () => dayAheadLabels(scope, range, coverageEarliest, coverageLatest),
+    [scope, range, coverageEarliest, coverageLatest]
+  );
+
   async function handleExport() {
     setExporting(true);
     try {
@@ -126,7 +190,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
                   title={disabled ? TOMORROW_DISABLED_SERIES_TITLE : undefined}
                   onClick={() => setSeriesFilter(s.key)}
                 >
-                  {s.label}
+                  {s.key === "dayAhead" ? dayAheadButtonLabel : s.label}
                 </button>
               );
             })}
@@ -191,6 +255,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
         <PriceHistoryChart
           rows={displayRows}
           seriesFilter={seriesFilter}
+          dayAheadLabel={dayAheadChartLabel}
           emptyMessage={
             scope === "today"
               ? TODAY_NOT_PUBLISHED_MESSAGE
