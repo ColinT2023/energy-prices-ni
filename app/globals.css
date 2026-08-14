@@ -652,32 +652,48 @@ h1 {
   white-space: nowrap;
 }
 
+/* Non-interactive counterpart to .sort-button, for columns whose sort is
+   driven by the chip+menu (ColumnSortButton) instead of a clickable
+   header — same type/colour as the header text around it, just not a
+   button, since clicking it no longer does anything. */
+.col-label {
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+}
+
 /* Full-contrast and bold against the header's otherwise-muted text —
-   mirrors .column-filter-trigger.active below, so "sorted by this" and
+   mirrors .column-menu-trigger.active below, so "sorted by this" and
    "filtered by this" read as the same kind of emphasis rather than two
    unrelated marks. Standard triangle glyphs (▲/▼, not ↑/↓) for the same
-   reason: one consistent arrow vocabulary across the whole header row. */
+   reason: one consistent arrow vocabulary across the whole header row.
+   Only used by Auction/Band/Status now — their header label stays
+   directly clickable (text-column A-Z-style toggle), unlike Settlement
+   period/Price, which moved to the chip+menu below. */
 .sort-arrow {
   color: var(--text);
   font-weight: 700;
 }
 
-/* Excel AutoFilter-style dropdown embedded in a column header, next to
-   its sort button — see ColumnFilterButton in PriceTable.jsx. Rendered
-   as a small grey chip (not just a bare glyph) so it reads immediately
-   as "click here for options", the same visual convention Excel itself
-   uses, rather than something that has to be discovered by hovering
-   every header. The menu itself is portaled to document.body and
-   positioned via inline style (position: fixed, top/left computed from
-   the trigger's real position) — see ColumnFilterButton — so only its
-   own appearance (background/border/spacing/typography) lives here,
-   not its position. */
-.column-filter {
+/* Excel AutoFilter-style dropdown embedded in a column header — see
+   ColumnMenuButton in PriceTable.jsx, shared by both per-value filtering
+   (Auction/Band/Status) and the sort-direction menu (Settlement period/
+   Price (p/kWh)/Price (£/MWh)), so both read as the same system rather
+   than two affordances that happen to look similar. Rendered as a small
+   grey chip (not just a bare glyph) so it reads immediately as "click
+   here for options", the same visual convention Excel itself uses,
+   rather than something that has to be discovered by hovering every
+   header. The menu itself is portaled to document.body and positioned
+   via inline style (position: fixed, top/left computed from the
+   trigger's real position) — see ColumnMenuButton — so only its own
+   appearance (background/border/spacing/typography) lives here, not its
+   position. */
+.column-menu {
   display: inline-block;
   margin-left: 4px;
 }
 
-.column-filter-trigger {
+.column-menu-trigger {
   background: var(--line);
   border: none;
   border-radius: 3px;
@@ -688,23 +704,24 @@ h1 {
   cursor: pointer;
 }
 
-.column-filter-trigger:hover,
-.column-filter-trigger:focus-visible {
+.column-menu-trigger:hover,
+.column-menu-trigger:focus-visible {
   background: var(--text-muted);
   color: var(--bg);
 }
 
-/* Same "only shown once it means something" idea as the sort arrow
-   (only appears once a column is actually the active sort) — filled
-   in and bolder once a filter is actually narrowing the rows, so which
-   columns are filtered is visible without opening each menu to check. */
-.column-filter-trigger.active {
+/* Same "only shown once it means something" idea as .sort-arrow (only
+   appears once a column is actually the active sort) — filled in and
+   bolder once a filter is narrowing the rows, or once this is the
+   active sort column, so which columns are active is visible without
+   opening each menu to check. */
+.column-menu-trigger.active {
   background: var(--text);
   color: var(--bg);
   font-weight: 700;
 }
 
-.column-filter-menu {
+.column-menu-list {
   min-width: 130px;
   display: flex;
   flex-direction: column;
@@ -717,7 +734,7 @@ h1 {
   z-index: 50;
 }
 
-.column-filter-option {
+.column-menu-option {
   background: none;
   border: none;
   color: var(--text);
@@ -730,12 +747,12 @@ h1 {
   white-space: nowrap;
 }
 
-.column-filter-option:hover,
-.column-filter-option:focus-visible {
+.column-menu-option:hover,
+.column-menu-option:focus-visible {
   background: var(--line);
 }
 
-.column-filter-option.active {
+.column-menu-option.active {
   font-weight: 700;
 }
 

@@ -171,6 +171,16 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
     }
   }
 
+  // For Settlement period/Price (p/kWh)/Price (£/MWh) — their header
+  // chip's menu picks a direction explicitly ("Smallest to largest"/
+  // "Largest to smallest"), rather than toggling whatever the previous
+  // direction was the way handleSort above does for a plain header
+  // click, so picking the same option twice is a no-op, not a flip.
+  function handleSortSelect(key, dir) {
+    setSortKey(key);
+    setSortDir(dir);
+  }
+
   function handleFilterChange(key, value) {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }
@@ -326,6 +336,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
           sortKey={sortKey}
           sortDir={sortDir}
           onSort={handleSort}
+          onSortSelect={handleSortSelect}
           filters={filters}
           onFilterChange={handleFilterChange}
         />

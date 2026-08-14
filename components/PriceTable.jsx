@@ -4,19 +4,24 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatLondonDateTime } from "../lib/londonTime";
 import { AUCTION_LABEL, BAND_LABEL, formatPence, formatGbp } from "../lib/priceSeries";
-import { COLUMNS, STATUS_COLUMN, hasActiveFilters } from "../lib/priceTableView";
+import { COLUMNS, STATUS_COLUMN, SORT_DIRECTION_OPTIONS, hasActiveFilters } from "../lib/priceTableView";
 
 const BAND_COLOUR = { low: "var(--low)", average: "var(--average)", peak: "var(--peak)" };
 
 /** Excel AutoFilter-style dropdown embedded in a column header — a small
- * ▼ trigger next to the sort button, opening a short list of that
- * column's possible values plus "All". Only one menu is open at a time
- * (openKey/setOpenKey lifted to the table), closed by picking an option,
- * clicking outside, Escape, or scrolling.
+ * ▼ chip trigger opening a short options menu. Shared by two callers
+ * below: per-value filtering (ColumnFilterButton, on Auction/Band/
+ * Status) and the sort-direction menu (ColumnSortButton, on Settlement
+ * period/Price (p/kWh)/Price (£/MWh)) — one trigger, one menu, one
+ * "filled in once it's active" colour rule, so the whole header row
+ * reads as one system rather than a filter affordance and a sort
+ * affordance that happen to look alike. Only one menu is open at a time
+ * across both kinds (openKey/setOpenKey lifted to the table), closed by
+ * picking an option, clicking outside, Escape, or scrolling.
  *
  * The menu itself is portaled to document.body and positioned with
  * `position: fixed` from the trigger's real getBoundingClientRect(),
- * rather than `position: absolute` inside .column-filter — the table
+ * rather than `position: absolute` inside .column-menu — the table
  * lives inside .table-scroll, whose overflow-x: auto (which forces
  * overflow-y: auto too, per the CSS overflow spec) clips any
  * absolutely-positioned descendant that renders past its own box, so a
@@ -26,10 +31,10 @@ const BAND_COLOUR = { low: "var(--low)", average: "var(--average)", peak: "var(-
  * entirely — the same fix shape as the earlier chart-tooltip overflow
  * issue, which needed to escape its own anchor's constraints the same
  * way. */
-function ColumnFilterButton({ column, value, onChange, openKey, setOpenKey }) {
+function ColumnMenuButton({ menuKey, ariaLabel, active, options, isSelected, onSelect, openKey, setOpenKey }) {
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
-  const isOpen = openKey === column.key;
+  const isOpen = openKey === menuKey;
   const [menuPos, setMenuPos] = useState(null);
 
   useLayoutEffect(() => {
@@ -87,17 +92,16 @@ function ColumnFilterButton({ column, value, onChange, openKey, setOpenKey }) {
     };
   }, [isOpen, setOpenKey]);
 
-  const active = value !== "all";
   return (
-    <span className="column-filter">
+    <span className="column-menu">
       <button
         ref={triggerRef}
         type="button"
-        className={active ? "column-filter-trigger active" : "column-filter-trigger"}
+        className={active ? "column-menu-trigger active" : "column-menu-trigger"}
         aria-haspopup="true"
         aria-expanded={isOpen}
-        aria-label={`Filter ${column.label}`}
-        onClick={() => setOpenKey(isOpen ? null : column.key)}
+        aria-label={ariaLabel}
+        onClick={() => setOpenKey(isOpen ? null : menuKey)}
       >
         ▼
       </button>
@@ -105,20 +109,20 @@ function ColumnFilterButton({ column, value, onChange, openKey, setOpenKey }) {
         menuPos &&
         createPortal(
           <span
-            className="column-filter-menu"
+            className="column-menu-list"
             role="menu"
             ref={menuRef}
             style={{ position: "fixed", top: menuPos.top, left: menuPos.left }}
           >
-            {column.filterOptions.map((opt) => (
+            {options.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 role="menuitemradio"
-                aria-checked={value === opt.value}
-                className={value === opt.value ? "column-filter-option active" : "column-filter-option"}
+                aria-checked={isSelected(opt.value)}
+                className={isSelected(opt.value) ? "column-menu-option active" : "column-menu-option"}
                 onClick={() => {
-                  onChange(column.key, opt.value);
+                  onSelect(opt.value);
                   setOpenKey(null);
                 }}
               >
@@ -129,6 +133,42 @@ function ColumnFilterButton({ column, value, onChange, openKey, setOpenKey }) {
           document.body
         )}
     </span>
+  );
+}
+
+function ColumnFilterButton({ column, value, onChange, openKey, setOpenKey }) {
+  return (
+    <ColumnMenuButton
+      menuKey={`filter:${column.key}`}
+      ariaLabel={`Filter ${column.label}`}
+      active={value !== "all"}
+      options={column.filterOptions}
+      isSelected={(v) => v === value}
+      onSelect={(v) => onChange(column.key, v)}
+      openKey={openKey}
+      setOpenKey={setOpenKey}
+    />
+  );
+}
+
+/** "Smallest to largest"/"Largest to smallest" — Excel's own wording for
+ * numeric and date/time columns (as opposed to the "A-Z"/"Z-A" it uses
+ * for text columns), which is what Settlement period and both price
+ * columns actually are. Auction/Band/Status keep the plain click-to-
+ * toggle header instead, since they're the text columns here. */
+function ColumnSortButton({ column, sortKey, sortDir, onSelect, openKey, setOpenKey }) {
+  const isActiveColumn = sortKey === column.key;
+  return (
+    <ColumnMenuButton
+      menuKey={`sort:${column.key}`}
+      ariaLabel={`Sort ${column.label}`}
+      active={isActiveColumn}
+      options={SORT_DIRECTION_OPTIONS}
+      isSelected={(v) => isActiveColumn && sortDir === v}
+      onSelect={(dir) => onSelect(column.key, dir)}
+      openKey={openKey}
+      setOpenKey={setOpenKey}
+    />
   );
 }
 
@@ -152,8 +192,21 @@ function ColumnFilterButton({ column, value, onChange, openKey, setOpenKey }) {
  * Status = Official, since no visible row would still have
  * provisional: true to detect.
  */
-export default function PriceTable({ rows, hasProvisional, sortKey, sortDir, onSort, filters, onFilterChange }) {
-  const [openFilterKey, setOpenFilterKey] = useState(null);
+export default function PriceTable({
+  rows,
+  hasProvisional,
+  sortKey,
+  sortDir,
+  onSort,
+  onSortSelect,
+  filters,
+  onFilterChange,
+}) {
+  // Shared across both the per-value filter menus and the sort-direction
+  // menus, prefixed by kind (filter:/sort:) — so opening one always
+  // closes any other, filter or sort, rather than letting two popovers
+  // stack.
+  const [openMenuKey, setOpenMenuKey] = useState(null);
   const columns = hasProvisional ? [...COLUMNS, STATUS_COLUMN] : COLUMNS;
 
   if (rows.length === 0) {
@@ -175,21 +228,35 @@ export default function PriceTable({ rows, hasProvisional, sortKey, sortDir, onS
                 aria-sort={sortKey === col.key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                 title={col.title}
               >
-                <button type="button" className="sort-button" onClick={() => onSort(col.key)}>
-                  {col.label}
-                  {sortKey === col.key && (
-                    <span className="sort-arrow" aria-hidden="true">
-                      {sortDir === "asc" ? " ▲" : " ▼"}
-                    </span>
-                  )}
-                </button>
+                {col.sortMenu ? (
+                  <>
+                    <span className="col-label">{col.label}</span>
+                    <ColumnSortButton
+                      column={col}
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSelect={onSortSelect}
+                      openKey={openMenuKey}
+                      setOpenKey={setOpenMenuKey}
+                    />
+                  </>
+                ) : (
+                  <button type="button" className="sort-button" onClick={() => onSort(col.key)}>
+                    {col.label}
+                    {sortKey === col.key && (
+                      <span className="sort-arrow" aria-hidden="true">
+                        {sortDir === "asc" ? " ▲" : " ▼"}
+                      </span>
+                    )}
+                  </button>
+                )}
                 {col.filterOptions && (
                   <ColumnFilterButton
                     column={col}
                     value={filters[col.key]}
                     onChange={onFilterChange}
-                    openKey={openFilterKey}
-                    setOpenKey={setOpenFilterKey}
+                    openKey={openMenuKey}
+                    setOpenKey={setOpenMenuKey}
                   />
                 )}
               </th>
