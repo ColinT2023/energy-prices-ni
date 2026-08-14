@@ -60,14 +60,23 @@ function buildScales(points) {
 
 const LONDON_TZ = "Europe/London";
 
-/** "12 Aug" — day + short month, no year (weekly ticks, day-boundary ticks). */
-function shortDateLabel(t) {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: LONDON_TZ, day: "numeric", month: "short" }).format(new Date(t));
+/** "12 Aug" (or "12 Aug 2026" with `withYear`) — day-boundary/weekly ticks. */
+function shortDateLabel(t, withYear) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: LONDON_TZ,
+    day: "numeric",
+    month: "short",
+    year: withYear ? "numeric" : undefined,
+  }).format(new Date(t));
 }
 
-/** "Aug 2026" — month + year, no day (monthly ticks on a very wide range). */
-function monthYearLabel(t) {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: LONDON_TZ, month: "short", year: "numeric" }).format(new Date(t));
+/** "Aug" (or "Aug 2026" with `withYear`) — monthly ticks on a wide range. */
+function monthLabel(t, withYear) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: LONDON_TZ,
+    month: "short",
+    year: withYear ? "numeric" : undefined,
+  }).format(new Date(t));
 }
 
 /** `dateUtc` (a London-local midnight instant) advanced by `n` calendar
@@ -100,7 +109,9 @@ function chooseHourInterval(spanHours, maxTicks = 9) {
  * SEMOpx's own chart, so a multi-day range doesn't repeat the date on
  * every tick while still making each day's start unambiguous. Interval
  * length is chosen to land near round hour-of-day marks (matching the
- * Ring's own major-hour set at 3h) without hardcoding per scope.
+ * Ring's own major-hour set at 3h) without hardcoding per scope. Same
+ * principle for the year: only on the range's first date label and
+ * again wherever it actually changes, not on every one.
  *
  * Fixed-ms stepping from a real London midnight anchor — this can drift
  * up to an hour off a clean local-hour mark if the tick sequence itself
@@ -115,11 +126,26 @@ function buildSubDayTicks(minT, maxT) {
   let t = londonMidnightUtc(new Date(minT)).getTime();
   while (t < minT) t += stepMs;
   let lastYmd = null;
+  let lastYear = null;
   for (; t <= maxT; t += stepMs) {
     const ymd = londonYmd(new Date(t));
     const isDayBoundary = ymd !== lastYmd;
     lastYmd = ymd;
-    ticks.push({ t, isDayBoundary, label: isDayBoundary ? shortDateLabel(t) : formatLondonTime(t) });
+    let label;
+    let hasYear = false;
+    if (isDayBoundary) {
+      // Year shown on the range's first tick (lastYear starts null) and
+      // again wherever it actually changes (a range crossing New Year's),
+      // never on every date label — same "don't add noise until it's
+      // needed" idea as the boundary bolding itself.
+      const year = ymd.slice(0, 4);
+      hasYear = year !== lastYear;
+      label = shortDateLabel(t, hasYear);
+      lastYear = year;
+    } else {
+      label = formatLondonTime(t);
+    }
+    ticks.push({ t, isDayBoundary, hasYear, label });
   }
   return ticks;
 }
@@ -149,16 +175,26 @@ function buildAggregatedTicks(minT, maxT) {
     let cursor = londonMidnightUtc(new Date(minT));
     const daysToMonday = (8 - cursor.getUTCDay()) % 7; // London midnight's UTC weekday is safe here — London is never behind UTC
     cursor = londonMidnightUtc(new Date(cursor.getTime() + daysToMonday * 86400000));
+    let lastYear = null;
     for (; cursor.getTime() <= maxT; cursor = londonMidnightUtc(new Date(cursor.getTime() + intervalDays * 86400000))) {
-      if (cursor.getTime() >= minT) ticks.push({ t: cursor.getTime(), isDayBoundary: false, label: shortDateLabel(cursor.getTime()) });
+      if (cursor.getTime() >= minT) {
+        const year = londonYmd(cursor).slice(0, 4);
+        const hasYear = year !== lastYear;
+        ticks.push({ t: cursor.getTime(), isDayBoundary: false, hasYear, label: shortDateLabel(cursor.getTime(), hasYear) });
+        lastYear = year;
+      }
     }
   } else {
     const stepMonths = Math.max(1, Math.ceil(spanDays / 30.44 / 9));
     const firstOfMonth = `${londonYmd(new Date(minT)).slice(0, 7)}-01T00:00:00Z`;
     let cursor = londonMidnightUtc(new Date(firstOfMonth));
     while (cursor.getTime() < minT) cursor = addMonthsLondon(cursor, stepMonths);
+    let lastYear = null;
     for (; cursor.getTime() <= maxT; cursor = addMonthsLondon(cursor, stepMonths)) {
-      ticks.push({ t: cursor.getTime(), isDayBoundary: false, label: monthYearLabel(cursor.getTime()) });
+      const year = londonYmd(cursor).slice(0, 4);
+      const hasYear = year !== lastYear;
+      ticks.push({ t: cursor.getTime(), isDayBoundary: false, hasYear, label: monthLabel(cursor.getTime(), hasYear) });
+      lastYear = year;
     }
   }
   return ticks;
@@ -490,15 +526,31 @@ export default function PriceHistoryChart({
         </div>
 
         <div className="chart-x-labels">
-          {xTicks.map((tk) => (
-            <span
-              key={tk.t}
-              className={tk.isDayBoundary ? "chart-x-label chart-x-label-boundary" : "chart-x-label"}
-              style={{ left: `${(scales.x(tk.t) / VIEW_W) * 100}%` }}
-            >
-              {tk.label}
-            </span>
-          ))}
+          {xTicks.map((tk) => {
+            const pct = (scales.x(tk.t) / VIEW_W) * 100;
+            // Centred labels (the default) overflow their own edge once
+            // close enough to 0%/100% — most visible on the first tick,
+            // now that it can be as wide as "14 Aug 2026" rather than
+            // just "14 Aug". Anchored left/right instead of centred once
+            // within a label-width's-worth of either edge, so it grows
+            // inward from the edge rather than spilling past it.
+            const edgeAnchor = pct < 6 ? "start" : pct > 94 ? "end" : "middle";
+            const classNames = ["chart-x-label"];
+            if (tk.isDayBoundary) classNames.push("chart-x-label-boundary");
+            if (tk.hasYear) classNames.push("chart-x-label-year");
+            return (
+              <span
+                key={tk.t}
+                className={classNames.join(" ")}
+                style={{
+                  left: `${pct}%`,
+                  transform: edgeAnchor === "start" ? "translateX(0)" : edgeAnchor === "end" ? "translateX(-100%)" : "translateX(-50%)",
+                }}
+              >
+                {tk.label}
+              </span>
+            );
+          })}
         </div>
         </>
       )}

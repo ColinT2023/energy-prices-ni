@@ -421,6 +421,18 @@ h1 {
   .chart-x-label:nth-child(even) {
     display: none;
   }
+
+  /* A label with the year attached (e.g. "14 Aug 2026" vs "14 Aug") is
+     wide enough that, on the narrowest widths, the every-other thinning
+     above isn't enough on its own — the very next surviving tick still
+     collided with it. Only ever the tick two DOM positions later (the
+     immediately-next one is already hidden by the rule above), and only
+     when that year is actually showing, not every boundary tick — most
+     boundary ticks (7 day's "9 Aug", "10 Aug"...) are the normal width
+     and don't need this. */
+  .chart-x-label-year + .chart-x-label + .chart-x-label {
+    display: none;
+  }
 }
 
 .chart-tooltip {
