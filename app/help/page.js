@@ -99,6 +99,10 @@ const SECTIONS = [
         body: "Use the arrows or the date picker above the Ring to look at any earlier day, back to when this site's records begin.",
       },
       {
+        term: "Provisional data toggle",
+        body: "Switch on to fill in today's not-yet-official prices where the confirmed figure hasn't landed yet — off by default. See “Provisional prices” above for what that means and how it's marked.",
+      },
+      {
         term: "Chart and Table view",
         body: "The price history section below the Ring can show the same data as a chart or as a sortable table — switch between them with the Chart/Table buttons.",
       },
