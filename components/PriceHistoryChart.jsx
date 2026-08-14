@@ -255,6 +255,7 @@ function buildTooltipPoints(dayAheadPoints, intradayPoints) {
       intradayGbp: null,
       intradayProvisional: false,
       intradayAuction: null,
+      intradayBand: null,
     });
   }
   for (const p of intradayPoints) {
@@ -264,6 +265,7 @@ function buildTooltipPoints(dayAheadPoints, intradayPoints) {
       existing.intradayGbp = p.priceGbp;
       existing.intradayProvisional = p.provisional;
       existing.intradayAuction = p.auction;
+      existing.intradayBand = p.band;
     } else {
       byTime.set(p.t, {
         t: p.t,
@@ -274,6 +276,7 @@ function buildTooltipPoints(dayAheadPoints, intradayPoints) {
         intradayGbp: p.priceGbp,
         intradayProvisional: p.provisional,
         intradayAuction: p.auction,
+        intradayBand: p.band,
       });
     }
   }
@@ -555,7 +558,12 @@ export default function PriceHistoryChart({
               )}
               {activePoint.intraday != null && (
                 <div>
-                  <span className="chart-tooltip-swatch" style={{ background: "var(--average)" }} />
+                  {/* Matches the intraday line's own gradient at this exact
+                      point (both keyed off the same per-point band), not a
+                      fixed colour — the line's colour genuinely changes
+                      along its length, so a static swatch would just be
+                      wrong for most points it's shown next to. */}
+                  <span className="chart-tooltip-swatch" style={{ background: BAND_HEX[activePoint.intradayBand] }} />
                   {intradayDisplayLabel(activePoint.intradayAuction)} · {formatPence(activePoint.intradayGbp)}p · £
                   {formatGbp(activePoint.intradayGbp)}/MWh
                   {isAggregated ? " avg" : ""}
