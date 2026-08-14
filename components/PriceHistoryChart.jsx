@@ -10,7 +10,13 @@ import {
   formatPence,
   formatGbp,
 } from "../lib/priceSeries";
-import { formatLondonTime, formatLondonDateTime, formatLongDate, londonYmd } from "../lib/londonTime";
+import {
+  formatLondonTime,
+  formatLondonDateTime,
+  formatLongDate,
+  londonYmd,
+  londonMidnightUtc,
+} from "../lib/londonTime";
 
 // SVG stop-color doesn't reliably resolve CSS custom properties across
 // renderers/exports, so the band hexes are duplicated here from the
@@ -45,9 +51,117 @@ function buildScales(points) {
   return {
     x: (t) => ((t - xMin) / xRange) * VIEW_W,
     y: (v) => VIEW_H - PAD_Y - ((v - yMin) / yRange) * (VIEW_H - PAD_Y * 2),
+    xMin,
+    xMax,
     yMax,
     yRange,
   };
+}
+
+const LONDON_TZ = "Europe/London";
+
+/** "12 Aug" — day + short month, no year (weekly ticks, day-boundary ticks). */
+function shortDateLabel(t) {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: LONDON_TZ, day: "numeric", month: "short" }).format(new Date(t));
+}
+
+/** "Aug 2026" — month + year, no day (monthly ticks on a very wide range). */
+function monthYearLabel(t) {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: LONDON_TZ, month: "short", year: "numeric" }).format(new Date(t));
+}
+
+/** `dateUtc` (a London-local midnight instant) advanced by `n` calendar
+ * months, still landing on that later month's own London-local midnight —
+ * used for monthly x-axis ticks on very wide ranges. */
+function addMonthsLondon(dateUtc, n) {
+  const [y, m] = londonYmd(dateUtc).split("-").map(Number);
+  const totalMonths = y * 12 + (m - 1) + n;
+  const newY = Math.floor(totalMonths / 12);
+  const newM = (totalMonths % 12) + 1;
+  return londonMidnightUtc(new Date(`${newY}-${String(newM).padStart(2, "0")}-01T00:00:00Z`));
+}
+
+/** Smallest of the candidate hour intervals that keeps the tick count at
+ * or under `maxTicks` across the given span — used for Today/7 day so tick
+ * density scales down as the range widens rather than one fixed interval
+ * being too sparse for a day or too crowded for a week. */
+function chooseHourInterval(spanHours, maxTicks = 9) {
+  const candidates = [1, 2, 3, 4, 6, 8, 12, 24];
+  for (const h of candidates) {
+    if (spanHours / h <= maxTicks) return h;
+  }
+  return 24;
+}
+
+/**
+ * Ticks for Today/7 day (half-hourly, non-aggregated data): time-only at
+ * each interval (e.g. "14:00"), except the first tick of each London-
+ * local day, which shows the date instead (e.g. "14 Aug") — same idea as
+ * SEMOpx's own chart, so a multi-day range doesn't repeat the date on
+ * every tick while still making each day's start unambiguous. Interval
+ * length is chosen to land near round hour-of-day marks (matching the
+ * Ring's own major-hour set at 3h) without hardcoding per scope.
+ *
+ * Fixed-ms stepping from a real London midnight anchor — this can drift
+ * up to an hour off a clean local-hour mark if the tick sequence itself
+ * crosses a DST transition (twice a year), a cosmetic-only edge case not
+ * worth the added complexity of re-deriving each step from wall-clock
+ * arithmetic instead.
+ */
+function buildSubDayTicks(minT, maxT) {
+  const spanHours = (maxT - minT) / 3600000;
+  const stepMs = chooseHourInterval(spanHours) * 3600000;
+  const ticks = [];
+  let t = londonMidnightUtc(new Date(minT)).getTime();
+  while (t < minT) t += stepMs;
+  let lastYmd = null;
+  for (; t <= maxT; t += stepMs) {
+    const ymd = londonYmd(new Date(t));
+    const isDayBoundary = ymd !== lastYmd;
+    lastYmd = ymd;
+    ticks.push({ t, isDayBoundary, label: isDayBoundary ? shortDateLabel(t) : formatLondonTime(t) });
+  }
+  return ticks;
+}
+
+/**
+ * Ticks for All time/wide Custom (daily-aggregated data): date-only,
+ * thinned to weekly or monthly depending on total span so a ~224 day
+ * range doesn't render one label per point. Under 60 days uses
+ * Monday-aligned weekly-ish steps (1/2/3/7/14/21/30 days, whichever keeps
+ * the count readable); beyond that, calendar-month starts, stepping by
+ * more than one month if even a monthly cadence would still be crowded
+ * (only relevant once this site's history spans several years).
+ */
+function buildAggregatedTicks(minT, maxT) {
+  const spanDays = (maxT - minT) / 86400000;
+  const ticks = [];
+
+  if (spanDays <= 60) {
+    const candidates = [1, 2, 3, 7, 14, 21, 30];
+    let intervalDays = 30;
+    for (const d of candidates) {
+      if (spanDays / d <= 9) {
+        intervalDays = d;
+        break;
+      }
+    }
+    let cursor = londonMidnightUtc(new Date(minT));
+    const daysToMonday = (8 - cursor.getUTCDay()) % 7; // London midnight's UTC weekday is safe here — London is never behind UTC
+    cursor = londonMidnightUtc(new Date(cursor.getTime() + daysToMonday * 86400000));
+    for (; cursor.getTime() <= maxT; cursor = londonMidnightUtc(new Date(cursor.getTime() + intervalDays * 86400000))) {
+      if (cursor.getTime() >= minT) ticks.push({ t: cursor.getTime(), isDayBoundary: false, label: shortDateLabel(cursor.getTime()) });
+    }
+  } else {
+    const stepMonths = Math.max(1, Math.ceil(spanDays / 30.44 / 9));
+    const firstOfMonth = `${londonYmd(new Date(minT)).slice(0, 7)}-01T00:00:00Z`;
+    let cursor = londonMidnightUtc(new Date(firstOfMonth));
+    while (cursor.getTime() < minT) cursor = addMonthsLondon(cursor, stepMonths);
+    for (; cursor.getTime() <= maxT; cursor = addMonthsLondon(cursor, stepMonths)) {
+      ticks.push({ t: cursor.getTime(), isDayBoundary: false, label: monthYearLabel(cursor.getTime()) });
+    }
+  }
+  return ticks;
 }
 
 /** Inverse of scales.y at a given gridline fraction of the chart's height. */
@@ -215,6 +329,10 @@ export default function PriceHistoryChart({
     () => buildScales([...dayAheadPoints, ...intradayPoints]),
     [dayAheadPoints, intradayPoints]
   );
+  const xTicks = useMemo(() => {
+    if (!scales) return [];
+    return isAggregated ? buildAggregatedTicks(scales.xMin, scales.xMax) : buildSubDayTicks(scales.xMin, scales.xMax);
+  }, [scales, isAggregated]);
   const tooltipPoints = useMemo(
     () => buildTooltipPoints(dayAheadPoints, intradayPoints),
     [dayAheadPoints, intradayPoints]
@@ -236,6 +354,7 @@ export default function PriceHistoryChart({
       {!scales ? (
         <p className="placeholder-note">{emptyMessage}</p>
       ) : (
+        <>
         <div className="chart-plot">
           <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} width="100%" height="200" preserveAspectRatio="none">
             <defs>
@@ -248,6 +367,19 @@ export default function PriceHistoryChart({
             {GRIDLINE_FRACTIONS.map((f) => (
               <line key={f} x1="0" y1={VIEW_H * f} x2={VIEW_W} y2={VIEW_H * f} stroke="var(--line)" strokeWidth="1" />
             ))}
+            {xTicks
+              .filter((tk) => tk.isDayBoundary)
+              .map((tk) => (
+                <line
+                  key={`day-${tk.t}`}
+                  x1={scales.x(tk.t)}
+                  x2={scales.x(tk.t)}
+                  y1={PAD_Y}
+                  y2={VIEW_H - PAD_Y}
+                  stroke="var(--line)"
+                  strokeWidth="1"
+                />
+              ))}
             {dayAheadPoints.length > 1 &&
               (dayAheadPoints.some((p) => p.provisional) ? (
                 toPathSegments(dayAheadPoints, scales).map((seg) => (
@@ -356,6 +488,19 @@ export default function PriceHistoryChart({
             </div>
           )}
         </div>
+
+        <div className="chart-x-labels">
+          {xTicks.map((tk) => (
+            <span
+              key={tk.t}
+              className={tk.isDayBoundary ? "chart-x-label chart-x-label-boundary" : "chart-x-label"}
+              style={{ left: `${(scales.x(tk.t) / VIEW_W) * 100}%` }}
+            >
+              {tk.label}
+            </span>
+          ))}
+        </div>
+        </>
       )}
       <div className="auction-key">
         {showDayAhead && (

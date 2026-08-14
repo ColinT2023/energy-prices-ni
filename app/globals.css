@@ -381,6 +381,48 @@ h1 {
   color: var(--text-muted);
 }
 
+/* Below .chart-plot, not overlaid on it — a fixed-height row of labels
+   positioned by the same left% the SVG's own x-scale uses (both are
+   100%-width, so a tick's viewBox x-position and its label's CSS left%
+   line up without needing to duplicate the scale in two unit systems). */
+.chart-x-labels {
+  position: relative;
+  height: 16px;
+  margin-top: 6px;
+}
+
+.chart-x-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* The date label at each day's first tick (Today/7 day) — set apart from
+   the plain time ticks around it the same way the day-boundary line
+   through the plot itself is, so the date reads as the more load-bearing
+   label rather than blending into the hourly ones. */
+.chart-x-label-boundary {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Narrow widths can't fit every tick this component generates (targeting
+   ~9 on desktop) without crowding — thinning every other one keeps
+   spacing even rather than truncating/rotating text. Day-boundary ticks
+   in the Today/7 day case are unaffected: at the interval this component
+   picks for a single day (3h -> 8 ticks/day), the boundary tick always
+   lands at an odd position (00:00 is tick 1 of 8), so this rule only ever
+   thins the plain hourly ticks around it, never a date label itself. */
+@media (max-width: 480px) {
+  .chart-x-label:nth-child(even) {
+    display: none;
+  }
+}
+
 .chart-tooltip {
   position: absolute;
   top: 8px;
