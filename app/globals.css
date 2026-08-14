@@ -300,7 +300,7 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -313,6 +313,40 @@ h1 {
   color: var(--text-muted);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* Live readout of the active date scope — shown once above the whole
+   control area, deliberately never inside a series/scope button itself,
+   so it stays visibly independent of which auction type is selected. */
+.viewing-indicator {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.controls-explainer {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+  max-width: 60ch;
+}
+
+/* Groups a labelled toggle (Auction type, Date range) so it reads as its
+   own control, not just more buttons in the same row as everything
+   else. */
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group-label {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .toggle {
@@ -492,9 +526,9 @@ h1 {
 
 .section-controls {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
 }
 
 .export-button {

@@ -362,7 +362,6 @@ export default function PriceHistoryChart({
   rows,
   emptyMessage = "No data yet for this range.",
   seriesFilter = "both",
-  dayAheadLabel = "Day ahead",
 }) {
   const showDayAhead = seriesFilter !== "intraday";
   const showIntraday = seriesFilter !== "dayAhead";
@@ -607,7 +606,7 @@ export default function PriceHistoryChart({
       <div className="auction-key">
         {showDayAhead && (
           <span>
-            <span className="line-sample" /> {dayAheadLabel}
+            <span className="line-sample" /> Day ahead
           </span>
         )}
         {showIntraday && (

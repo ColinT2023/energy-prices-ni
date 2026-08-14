@@ -47,19 +47,11 @@ function rowsForSeries(rows, seriesFilter) {
   return rows;
 }
 
-/** Short-form date for a label — includes the year only when it isn't
- * the current one, so the common case (this year's data) stays compact
- * without silently becoming ambiguous for an older Custom-range date. */
-function labelDate(ymd) {
-  const currentYear = londonYmd(new Date()).slice(0, 4);
-  return ymd.slice(0, 4) === currentYear ? formatShortDate(ymd) : formatLongDate(ymd);
-}
-
 /**
- * The calendar day(s) the day-ahead series in view actually covers, as
- * {startYmd, endYmd} — the fact "Day ahead" alone doesn't state wherever
- * it appears, only implies via whichever scope tab happens to be
- * selected (see the button/chart label below, which spells it out).
+ * The calendar day(s) the currently selected date scope covers, as
+ * {startYmd, endYmd} — independent of which auction type (series) is
+ * selected, since date range and auction type are separate choices; this
+ * feeds the shared "Viewing: ..." indicator, not any one series button.
  * Derived from the same `range` already driving the fetch, rather than a
  * second, independently-reasoned date calculation — "full" is the one
  * exception, since `range.from` there is a sentinel far in the past, not
@@ -67,7 +59,7 @@ function labelDate(ymd) {
  * earliest/latest the chart's own "All time" caption and the Help page
  * already use, not a separate query for the same fact).
  */
-function dayAheadSpan(scope, range, coverageEarliest, coverageLatest) {
+function scopeSpan(scope, range, coverageEarliest, coverageLatest) {
   if (scope === "full") {
     if (!coverageEarliest || !coverageLatest) return null;
     return { startYmd: londonYmd(new Date(coverageEarliest)), endYmd: londonYmd(new Date(coverageLatest)) };
@@ -82,25 +74,26 @@ function dayAheadSpan(scope, range, coverageEarliest, coverageLatest) {
 }
 
 /**
- * "Day ahead" alone reads as if it always means "tomorrow's price" — for
- * a specific delivery date (especially Today, often already in effect by
- * the time it's viewed), that's a real contradiction someone would
- * otherwise have to resolve themselves by checking which scope tab is
- * selected. Names the actual date(s) in view instead, in two lengths:
- * `button` for the compact series toggle, `chart` for the fuller legend
- * caption where there's room to spell it out.
+ * "Viewing: 14 Aug 2026 (Today)" — a single readout of the active date
+ * scope, shown once above the whole control area rather than attached to
+ * any one series button. Only reacts to scope/range, never to
+ * seriesFilter, so it stays visibly true that date and auction type are
+ * two independent choices rather than one implying the other. A single
+ * day always carries its year (reads as a complete date on its own); a
+ * range only adds the year where the two ends actually differ (e.g. an
+ * "All time" span crossing a year boundary) rather than on every date.
  */
-function dayAheadLabels(scope, range, coverageEarliest, coverageLatest) {
-  const span = dayAheadSpan(scope, range, coverageEarliest, coverageLatest);
-  if (!span) return { button: "Day ahead", chart: "Day ahead" };
+function viewingLabel(scope, range, coverageEarliest, coverageLatest, scopeLabel) {
+  const span = scopeSpan(scope, range, coverageEarliest, coverageLatest);
+  if (!span) return null;
   const { startYmd, endYmd } = span;
   if (startYmd === endYmd) {
-    const d = labelDate(startYmd);
-    return { button: `Day ahead · ${d}`, chart: `Day ahead price for ${d}` };
+    return `Viewing: ${formatLongDate(startYmd)} (${scopeLabel})`;
   }
-  const from = labelDate(startYmd);
-  const to = labelDate(endYmd);
-  return { button: `Day ahead · ${from} – ${to}`, chart: `Day ahead price, ${from} – ${to}` };
+  const yearsDiffer = startYmd.slice(0, 4) !== endYmd.slice(0, 4);
+  const from = yearsDiffer ? formatLongDate(startYmd) : formatShortDate(startYmd);
+  const to = yearsDiffer ? formatLongDate(endYmd) : formatShortDate(endYmd);
+  return `Viewing: ${from} – ${to} (${scopeLabel})`;
 }
 
 /**
@@ -144,9 +137,10 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
   const [exporting, setExporting] = useState(false);
 
   const { earliest: coverageEarliest, latest: coverageLatest } = useDataCoverage();
-  const { button: dayAheadButtonLabel, chart: dayAheadChartLabel } = useMemo(
-    () => dayAheadLabels(scope, range, coverageEarliest, coverageLatest),
-    [scope, range, coverageEarliest, coverageLatest]
+  const scopeLabel = SCOPES.find((s) => s.key === scope)?.label ?? scope;
+  const viewingText = useMemo(
+    () => viewingLabel(scope, range, coverageEarliest, coverageLatest, scopeLabel),
+    [scope, range, coverageEarliest, coverageLatest, scopeLabel]
   );
 
   async function handleExport() {
@@ -163,20 +157,29 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
     <div className="section">
       <div className="section-head">
         <h2>Price history</h2>
-        <div className="section-controls">
-          <div className="toggle" role="group" aria-label="Chart or table view">
-            {VIEWS.map((v) => (
-              <button
-                key={v.key}
-                type="button"
-                className={v.key === view ? "active" : undefined}
-                aria-pressed={v.key === view}
-                onClick={() => setView(v.key)}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
+        {viewingText && <p className="viewing-indicator">{viewingText}</p>}
+      </div>
+
+      <p className="controls-explainer">
+        Date range and auction type are independent choices below — changing one never changes the other.
+      </p>
+
+      <div className="section-controls">
+        <div className="toggle" role="group" aria-label="Chart or table view">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              className={v.key === view ? "active" : undefined}
+              aria-pressed={v.key === view}
+              onClick={() => setView(v.key)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+        <div className="control-group">
+          <span className="control-group-label">Auction type</span>
           <div className="toggle" role="group" aria-label="Series">
             {SERIES.map((s) => {
               const disabled = scope === "tomorrow" && s.key !== TOMORROW_ONLY_SERIES;
@@ -190,11 +193,14 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
                   title={disabled ? TOMORROW_DISABLED_SERIES_TITLE : undefined}
                   onClick={() => setSeriesFilter(s.key)}
                 >
-                  {s.key === "dayAhead" ? dayAheadButtonLabel : s.label}
+                  {s.label}
                 </button>
               );
             })}
           </div>
+        </div>
+        <div className="control-group">
+          <span className="control-group-label">Date range</span>
           <div className="toggle" role="group" aria-label="Date range">
             {SCOPES.map((s) => (
               <button
@@ -211,15 +217,15 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className="export-button"
-            onClick={handleExport}
-            disabled={exporting || displayRows.length === 0}
-          >
-            {exporting ? "Exporting…" : "Export .xlsx"}
-          </button>
         </div>
+        <button
+          type="button"
+          className="export-button"
+          onClick={handleExport}
+          disabled={exporting || displayRows.length === 0}
+        >
+          {exporting ? "Exporting…" : "Export .xlsx"}
+        </button>
       </div>
 
       {scope === "custom" && (
@@ -255,7 +261,6 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
         <PriceHistoryChart
           rows={displayRows}
           seriesFilter={seriesFilter}
-          dayAheadLabel={dayAheadChartLabel}
           emptyMessage={
             scope === "today"
               ? TODAY_NOT_PUBLISHED_MESSAGE
