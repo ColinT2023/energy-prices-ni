@@ -27,9 +27,10 @@ export function useProvisionalPrices(enabled, range) {
     let cancelled = false;
 
     async function fetchRows() {
-      // range.to is null for "today" as a preset scope (see
-      // lib/priceRange.js) — open-ended is fine here too, same as
-      // useNiPrices.
+      // range.to is null for "7 day"/"full" (open-ended), but set for
+      // "today"/"tomorrow"/custom (see lib/priceRange.js) — bounded the
+      // same way here as in useNiPrices, so provisional rows never leak
+      // past whichever boundary the active scope actually has.
       let query = supabase
         .from("ni_prices_provisional_banded")
         .select("*")

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
-import { presetRange, customRange, TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
+import { presetRange, customRange, TODAY_NOT_PUBLISHED_MESSAGE, TOMORROW_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
 import { dayAheadSeries, latestIntradaySeries, mergeWithProvisional } from "../lib/priceSeries";
 import PriceHistoryChart from "./PriceHistoryChart";
@@ -11,10 +11,18 @@ import PriceTable from "./PriceTable";
 
 const SCOPES = [
   { key: "today", label: "Today" },
+  { key: "tomorrow", label: "Tomorrow" },
   { key: "7day", label: "7 day" },
   { key: "full", label: "All time" },
   { key: "custom", label: "Custom" },
 ];
+
+// Intraday auctions only ever run same-day — a future date can never have
+// intraday data, not "not yet", never. Series keys disabled for the
+// "tomorrow" scope specifically, forcing Day ahead as the only
+// selectable series there.
+const TOMORROW_ONLY_SERIES = "dayAhead";
+const TOMORROW_DISABLED_SERIES_TITLE = "Not available for Tomorrow — intraday auctions only ever run on the day itself.";
 
 const VIEWS = [
   { key: "chart", label: "Chart" },
@@ -106,17 +114,22 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
             ))}
           </div>
           <div className="toggle" role="group" aria-label="Series">
-            {SERIES.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                className={s.key === seriesFilter ? "active" : undefined}
-                aria-pressed={s.key === seriesFilter}
-                onClick={() => setSeriesFilter(s.key)}
-              >
-                {s.label}
-              </button>
-            ))}
+            {SERIES.map((s) => {
+              const disabled = scope === "tomorrow" && s.key !== TOMORROW_ONLY_SERIES;
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  className={s.key === seriesFilter ? "active" : undefined}
+                  aria-pressed={s.key === seriesFilter}
+                  disabled={disabled}
+                  title={disabled ? TOMORROW_DISABLED_SERIES_TITLE : undefined}
+                  onClick={() => setSeriesFilter(s.key)}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
           </div>
           <div className="toggle" role="group" aria-label="Date range">
             {SCOPES.map((s) => (
@@ -125,7 +138,10 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
                 type="button"
                 className={s.key === scope ? "active" : undefined}
                 aria-pressed={s.key === scope}
-                onClick={() => setScope(s.key)}
+                onClick={() => {
+                  setScope(s.key);
+                  if (s.key === "tomorrow") setSeriesFilter(TOMORROW_ONLY_SERIES);
+                }}
               >
                 {s.label}
               </button>
@@ -175,7 +191,13 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
         <PriceHistoryChart
           rows={displayRows}
           seriesFilter={seriesFilter}
-          emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
+          emptyMessage={
+            scope === "today"
+              ? TODAY_NOT_PUBLISHED_MESSAGE
+              : scope === "tomorrow"
+                ? TOMORROW_NOT_PUBLISHED_MESSAGE
+                : undefined
+          }
         />
       ) : (
         <PriceTable rows={rowsForSeries(displayRows, seriesFilter)} />
