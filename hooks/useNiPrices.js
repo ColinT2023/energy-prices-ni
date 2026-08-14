@@ -159,7 +159,14 @@ export function useNiPrices(range) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRows();
 
-    if (!supabase) return; // nothing to subscribe to without a configured client
+    // Nothing to subscribe to without a configured client, or without an
+    // active range (e.g. Custom selected but no dates picked yet) — a
+    // null range means fetchRows() above already just cleared rows and
+    // returned, so there's no query result a realtime subscription would
+    // ever need to keep in sync. Returning here before openChannel()
+    // skips channel setup entirely rather than opening one anyway and
+    // immediately having nothing for it to do.
+    if (!supabase || !range) return;
 
     function openChannel() {
       if (cancelled) return;
