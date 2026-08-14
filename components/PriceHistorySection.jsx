@@ -8,6 +8,14 @@ import { presetRange, customRange, tomorrowRange, TODAY_NOT_PUBLISHED_MESSAGE } 
 import { exportToExcel } from "../lib/exportExcel";
 import { mergeWithProvisional } from "../lib/priceSeries";
 import { londonYmd, formatShortDate, formatLongDate } from "../lib/londonTime";
+import {
+  toViewRows,
+  filterRows,
+  sortRows,
+  defaultFilters,
+  describeFilters,
+  describeSort,
+} from "../lib/priceTableView";
 import PriceHistoryChart from "./PriceHistoryChart";
 import PriceTable from "./PriceTable";
 
@@ -23,12 +31,12 @@ const VIEWS = [
   { key: "table", label: "Table" },
 ];
 
-// Chart-only — Table and the Excel export always show every auction's
-// row for whatever date range is active, unfiltered (see displayRows
-// below), since "overlay two series" is a chart-specific visual idea
-// that doesn't translate to a flat row of data. Tomorrow/Both only mean
-// anything alongside "today": they compare today's actual prices against
-// tomorrow's day-ahead price specifically, not some other range's.
+// Chart-only — Table and the Excel export are governed by their own
+// sort/filter state instead (see tableRows below), since "overlay two
+// series" is a chart-specific visual idea that doesn't translate to a
+// flat row of data. Tomorrow/Both only mean anything alongside "today":
+// they compare today's actual prices against tomorrow's day-ahead price
+// specifically, not some other range's.
 const CHART_SERIES = [
   { key: "intraday", label: "Intraday" },
   { key: "tomorrow", label: "Tomorrow" },
@@ -88,13 +96,16 @@ function viewingLabel(scope, range, coverageEarliest, coverageLatest, scopeLabel
 
 /**
  * Owns the Today/7 day/All time/Custom date range, the chart/table view
- * switch, and the chart-only Intraday/Tomorrow/Both series — resolves
- * the date range to a single {from, to} (lib/priceRange.js), fetches it
- * once via useNiPrices, and hands displayRows to whichever view is
- * active. Table and the Excel export always get displayRows unfiltered
- * (every auction's row for the active date range) — chart series has no
- * effect on either, since overlaying two series is a chart-specific
- * visual idea.
+ * switch, the chart-only Intraday/Tomorrow/Both series, and the table's
+ * sort/filter state — resolves the date range to a single {from, to}
+ * (lib/priceRange.js), fetches it once via useNiPrices, and hands
+ * displayRows to whichever view is active. Chart series has no effect on
+ * the table or the export, since overlaying two series is a chart-
+ * specific visual idea — but sort/filter (kept here rather than inside
+ * PriceTable) does apply to both, since the export is meant to match
+ * whatever the table is currently showing: tableRows below (via
+ * lib/priceTableView.js) is the one computation both the table and
+ * handleExport read from, so they can't independently drift.
  *
  * Whenever the date range is "today", a second, independent range
  * (tomorrowRange()) is also fetched — not gated on chart series actually
@@ -141,11 +152,55 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
     [scope, range, coverageEarliest, coverageLatest, scopeLabel]
   );
 
+  // Table sort/filter state lives here, not inside PriceTable, so the
+  // export button below can read the exact same state and produce a file
+  // that matches what's on screen — deliberately not reset on a scope
+  // change (same as sort already behaved before this existed), so
+  // switching Today -> 7 day keeps whatever sort/filter was active
+  // rather than silently discarding it.
+  const [sortKey, setSortKey] = useState("datetime");
+  const [sortDir, setSortDir] = useState("desc");
+  const [filters, setFilters] = useState(defaultFilters);
+
+  function handleSort(key) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "datetime" ? "desc" : "asc");
+    }
+  }
+
+  function handleFilterChange(key, value) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  }
+
+  // Whether the Status column/filter applies at all — from the
+  // *unfiltered* range, not the sorted-and-filtered rows below, so
+  // filtering down to Status = Official doesn't make the Status filter
+  // itself disappear (no visible row would still be provisional: true).
+  const hasProvisionalInRange = useMemo(() => displayRows.some((row) => row.provisional), [displayRows]);
+
+  // The exact rows the table renders and the export downloads — one
+  // computation, not two independently-filtered/sorted copies that could
+  // disagree. toViewRows adds the two display-only fields (pence, status)
+  // that filtering/sorting key off; filterRows and sortRows are the same
+  // functions the export note below describes.
+  const tableRows = useMemo(
+    () => sortRows(filterRows(toViewRows(displayRows), filters), sortKey, sortDir),
+    [displayRows, filters, sortKey, sortDir]
+  );
+
   async function handleExport() {
     setExporting(true);
     try {
       const suffix = scope === "custom" ? `${customFrom}-to-${customTo}` : scope;
-      await exportToExcel({ rows: displayRows, filenameSuffix: suffix });
+      await exportToExcel({
+        rows: tableRows,
+        filenameSuffix: suffix,
+        filterNote: describeFilters(filters),
+        sortNote: describeSort(sortKey, sortDir),
+      });
     } finally {
       setExporting(false);
     }
@@ -222,7 +277,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
           type="button"
           className="export-button"
           onClick={handleExport}
-          disabled={exporting || displayRows.length === 0}
+          disabled={exporting || tableRows.length === 0}
         >
           {exporting ? "Exporting…" : "Export .xlsx"}
         </button>
@@ -265,7 +320,15 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
           emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
         />
       ) : (
-        <PriceTable rows={displayRows} />
+        <PriceTable
+          rows={tableRows}
+          hasProvisional={hasProvisionalInRange}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={handleSort}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+        />
       )}
     </div>
   );

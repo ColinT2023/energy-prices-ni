@@ -652,6 +652,79 @@ h1 {
   white-space: nowrap;
 }
 
+/* Excel AutoFilter-style dropdown embedded in a column header, next to
+   its sort button — see ColumnFilterButton in PriceTable.jsx. Visual
+   language matches the Ring's existing info-tooltip popover
+   (bg-raised/line border/4px radius/monospace), the one other popover
+   this app already has, rather than inventing a second one. */
+.column-filter {
+  position: relative;
+  display: inline-block;
+  margin-left: 4px;
+}
+
+.column-filter-trigger {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.column-filter-trigger:hover,
+.column-filter-trigger:focus-visible {
+  color: var(--text);
+}
+
+/* Same "only shown once it means something" idea as the sort arrow
+   (only appears once a column is actually the active sort) — filled
+   in and bolder once a filter is actually narrowing the rows, so which
+   columns are filtered is visible without opening each menu to check. */
+.column-filter-trigger.active {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.column-filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px;
+  font-weight: 400;
+  z-index: 5;
+}
+
+.column-filter-option {
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.column-filter-option:hover,
+.column-filter-option:focus-visible {
+  background: var(--line);
+}
+
+.column-filter-option.active {
+  font-weight: 700;
+}
+
 .band-dot {
   display: inline-block;
   width: 8px;

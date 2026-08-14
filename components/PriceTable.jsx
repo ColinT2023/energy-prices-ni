@@ -1,78 +1,103 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatLondonDateTime } from "../lib/londonTime";
-import { AUCTION_LABEL, BAND_LABEL, gbpToPence, formatPence, formatGbp } from "../lib/priceSeries";
+import { AUCTION_LABEL, BAND_LABEL, formatPence, formatGbp } from "../lib/priceSeries";
+import { COLUMNS, STATUS_COLUMN, hasActiveFilters } from "../lib/priceTableView";
 
 const BAND_COLOUR = { low: "var(--low)", average: "var(--average)", peak: "var(--peak)" };
 
-const BASE_COLUMNS = [
-  {
-    key: "datetime",
-    label: "Settlement period",
-    // Easy to misread as "when the auction ran" — it's the delivery
-    // period the price applies to, priced by an auction that ran earlier
-    // (the afternoon before, for day ahead; earlier the same day, for
-    // intraday). Native title attribute keeps this discoverable on hover
-    // without needing a new tooltip component for one column.
-    title: "The delivery period this price applies to, not when the auction that set it ran.",
-  },
-  { key: "auction", label: "Auction" },
-  { key: "pence", label: "Price (p/kWh)" },
-  { key: "price_gbp", label: "Price (£/MWh)" },
-  { key: "band", label: "Band" },
-];
-const STATUS_COLUMN = { key: "status", label: "Status" };
+/** Excel AutoFilter-style dropdown embedded in a column header — a small
+ * ▾ trigger next to the sort button, opening a short list of that
+ * column's possible values plus "All". Only one menu is open at a time
+ * (openKey/setOpenKey lifted to the table), closed by picking an option,
+ * clicking outside, or Escape. */
+function ColumnFilterButton({ column, value, onChange, openKey, setOpenKey }) {
+  const ref = useRef(null);
+  const isOpen = openKey === column.key;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpenKey(null);
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setOpenKey(null);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, setOpenKey]);
+
+  const active = value !== "all";
+  return (
+    <span className="column-filter" ref={ref}>
+      <button
+        type="button"
+        className={active ? "column-filter-trigger active" : "column-filter-trigger"}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+        aria-label={`Filter ${column.label}`}
+        onClick={() => setOpenKey(isOpen ? null : column.key)}
+      >
+        ▾
+      </button>
+      {isOpen && (
+        <span className="column-filter-menu" role="menu">
+          {column.filterOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={value === opt.value}
+              className={value === opt.value ? "column-filter-option active" : "column-filter-option"}
+              onClick={() => {
+                onChange(column.key, opt.value);
+                setOpenKey(null);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
 
 /**
- * Sortable table over the same scoped rows as the chart — one row per
- * auction's price for a period (not collapsed to "latest"), so DA vs
- * intraday revisions are visible side by side. Carries the same
+ * Sortable, filterable table over the same scoped rows as the chart —
+ * one row per auction's price for a period (not collapsed to "latest"),
+ * so DA vs intraday revisions are visible side by side. Carries the same
  * information as the ring/chart in text form, per the brief's
  * accessibility floor: band is never colour-only here.
  *
- * The Status column only appears when `rows` actually contains a
- * provisional row (the same `provisional` flag mergeWithProvisional
- * tags them with) — inferred from the data itself rather than a
- * separate prop, so a toggle-off render (never any provisional rows)
- * looks exactly as it did before this column existed.
+ * `rows` arrives already sorted and filtered — PriceHistorySection owns
+ * that state (sortKey/sortDir/filters) and computes the final array via
+ * lib/priceTableView.js, the same functions the Excel export applies to
+ * the same state, so the table and the export can't independently drift.
+ * This component only renders and reports interactions upward.
+ *
+ * `hasProvisional` (whether to show the Status column/filter at all) is
+ * passed in from the *unfiltered* range rather than derived from `rows`
+ * here — deriving it from the already-filtered rows would make the
+ * Status filter disappear the moment someone filtered down to
+ * Status = Official, since no visible row would still have
+ * provisional: true to detect.
  */
-export default function PriceTable({ rows }) {
-  const [sortKey, setSortKey] = useState("datetime");
-  const [sortDir, setSortDir] = useState("desc");
-
-  const hasProvisional = useMemo(() => rows.some((row) => row.provisional), [rows]);
-  const columns = hasProvisional ? [...BASE_COLUMNS, STATUS_COLUMN] : BASE_COLUMNS;
-
-  const sorted = useMemo(() => {
-    const withPence = rows.map((row) => ({
-      ...row,
-      pence: gbpToPence(row.price_gbp),
-      status: row.provisional ? "Provisional" : "Official",
-    }));
-    const dir = sortDir === "asc" ? 1 : -1;
-    return withPence.sort((a, b) => {
-      const av = a[sortKey];
-      const bv = b[sortKey];
-      if (av == null && bv == null) return 0;
-      if (av == null) return 1;
-      if (bv == null) return -1;
-      if (typeof av === "number") return (av - bv) * dir;
-      return av < bv ? -dir : av > bv ? dir : 0;
-    });
-  }, [rows, sortKey, sortDir]);
-
-  function toggleSort(key) {
-    if (key === sortKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "datetime" ? "desc" : "asc");
-    }
-  }
+export default function PriceTable({ rows, hasProvisional, sortKey, sortDir, onSort, filters, onFilterChange }) {
+  const [openFilterKey, setOpenFilterKey] = useState(null);
+  const columns = hasProvisional ? [...COLUMNS, STATUS_COLUMN] : COLUMNS;
 
   if (rows.length === 0) {
-    return <p className="placeholder-note">No data yet for this range.</p>;
+    return (
+      <p className="placeholder-note">
+        {hasActiveFilters(filters) ? "No rows match the current filters." : "No data yet for this range."}
+      </p>
+    );
   }
 
   return (
@@ -86,17 +111,26 @@ export default function PriceTable({ rows }) {
                 aria-sort={sortKey === col.key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                 title={col.title}
               >
-                <button type="button" className="sort-button" onClick={() => toggleSort(col.key)}>
+                <button type="button" className="sort-button" onClick={() => onSort(col.key)}>
                   {col.label}
                   {sortKey === col.key && <span aria-hidden="true">{sortDir === "asc" ? " ↑" : " ↓"}</span>}
                 </button>
+                {col.filterOptions && (
+                  <ColumnFilterButton
+                    column={col}
+                    value={filters[col.key]}
+                    onChange={onFilterChange}
+                    openKey={openFilterKey}
+                    setOpenKey={setOpenFilterKey}
+                  />
+                )}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {sorted.map((row) => (
-            <tr key={`${row.datetime}-${row.market}`}>
+          {rows.map((row) => (
+            <tr key={`${row.datetime}-${row.market}-${row.auction}`}>
               <td>{formatLondonDateTime(row.datetime)}</td>
               <td>{AUCTION_LABEL[row.auction] ?? row.auction}</td>
               <td>{formatPence(row.price_gbp)}</td>
