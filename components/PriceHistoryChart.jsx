@@ -353,9 +353,10 @@ function tooltipText(point, isAggregated) {
  * point contributes its own band colour as a gradient stop) rather than a
  * fixed decorative gradient, so colour keeps meaning exactly one thing —
  * price level — everywhere on the page. Scope (Today/7 day/All time), the
- * chart/table toggle, and the series toggle (`seriesFilter`: "dayAhead" |
- * "intraday" | "both") all live in the parent PriceHistorySection; this
- * component just renders whatever rows it's given, for whichever
+ * chart/table toggle, and the series toggle (`seriesFilter`: "intraday" |
+ * "both" — no standalone "day ahead" option, since Both already carries
+ * an unchanged day-ahead line) all live in the parent PriceHistorySection;
+ * this component just renders whatever rows it's given, for whichever
  * series are selected.
  */
 export default function PriceHistoryChart({

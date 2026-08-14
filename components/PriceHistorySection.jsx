@@ -6,7 +6,7 @@ import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
 import { useDataCoverage } from "../hooks/useDataCoverage";
 import { presetRange, customRange, TODAY_NOT_PUBLISHED_MESSAGE, TOMORROW_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
-import { dayAheadSeries, latestIntradaySeries, mergeWithProvisional } from "../lib/priceSeries";
+import { latestIntradaySeries, mergeWithProvisional } from "../lib/priceSeries";
 import { londonYmd, formatShortDate, formatLongDate } from "../lib/londonTime";
 import PriceHistoryChart from "./PriceHistoryChart";
 import PriceTable from "./PriceTable";
@@ -20,10 +20,15 @@ const SCOPES = [
 ];
 
 // Intraday auctions only ever run same-day — a future date can never have
-// intraday data, not "not yet", never. Series keys disabled for the
-// "tomorrow" scope specifically, forcing Day ahead as the only
-// selectable series there.
-const TOMORROW_ONLY_SERIES = "dayAhead";
+// intraday data, not "not yet", never. "Intraday" alone is disabled for
+// the "tomorrow" scope specifically, forcing "Both" as the only
+// selectable series there — Both still shows a day-ahead-only chart in
+// that case (the intraday line just contributes no points, same
+// graceful-degradation behaviour Both already has whenever intraday
+// simply hasn't published yet for any other reason), so it's the
+// closest equivalent to the isolated day-ahead view a future date can
+// have, without a third "day ahead only" button.
+const TOMORROW_ONLY_SERIES = "both";
 const TOMORROW_DISABLED_SERIES_TITLE = "Not available for Tomorrow — intraday auctions only ever run on the day itself.";
 
 const VIEWS = [
@@ -31,18 +36,20 @@ const VIEWS = [
   { key: "table", label: "Table" },
 ];
 
+// No standalone "Day ahead" option — Both already carries an unchanged
+// day-ahead reference line, so isolating day ahead alone would only
+// duplicate what Both already shows whenever intraday hasn't repriced a
+// period yet, for one fewer button to scan.
 const SERIES = [
-  { key: "dayAhead", label: "Day ahead" },
   { key: "intraday", label: "Intraday" },
   { key: "both", label: "Both" },
 ];
 
 /** Rows for a given series selection — same logic the chart itself uses
- * (dayAheadSeries/latestIntradaySeries), so an export filtered to one
- * series matches exactly what that series means on the chart rather than
- * a naive "all rows for that auction" filter. */
+ * (latestIntradaySeries), so an export filtered to Intraday matches
+ * exactly what that series means on the chart rather than a naive "all
+ * rows for that auction" filter. */
 function rowsForSeries(rows, seriesFilter) {
-  if (seriesFilter === "dayAhead") return dayAheadSeries(rows);
   if (seriesFilter === "intraday") return latestIntradaySeries(rows);
   return rows;
 }
@@ -98,13 +105,14 @@ function viewingLabel(scope, range, coverageEarliest, coverageLatest, scopeLabel
 
 /**
  * Owns the Today/7 day/All time/Custom scope, the chart/table view
- * switch, and the Day ahead/Intraday/Both series toggle — resolves the
- * scope to a single {from, to} range (lib/priceRange.js), fetches it once
- * via useNiPrices, and hands the rows to whichever view is active. The
- * series toggle only affects the chart and the export (same principle as
- * the date scope: the export always matches what's currently shown) —
- * the table is unaffected, it already lists every auction's row
- * regardless of this toggle.
+ * switch, and the Intraday/Both series toggle — resolves the scope to a
+ * single {from, to} range (lib/priceRange.js), fetches it once via
+ * useNiPrices, and hands the rows to whichever view is active. The
+ * series toggle applies identically to the chart, the table, and the
+ * export — all three derive from the same rowsForSeries(displayRows,
+ * seriesFilter) call (the chart via its own seriesFilter prop, table and
+ * export via the shared helper below), so switching series can't leave
+ * one surface out of sync with what the others show.
  *
  * provisionalEnabled (from the page-level toggle) drives the chart, the
  * table, and the export alike — all three read from the same
