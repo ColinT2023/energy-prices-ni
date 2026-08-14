@@ -652,30 +652,46 @@ h1 {
   white-space: nowrap;
 }
 
+/* Full-contrast and bold against the header's otherwise-muted text —
+   mirrors .column-filter-trigger.active below, so "sorted by this" and
+   "filtered by this" read as the same kind of emphasis rather than two
+   unrelated marks. Standard triangle glyphs (▲/▼, not ↑/↓) for the same
+   reason: one consistent arrow vocabulary across the whole header row. */
+.sort-arrow {
+  color: var(--text);
+  font-weight: 700;
+}
+
 /* Excel AutoFilter-style dropdown embedded in a column header, next to
-   its sort button — see ColumnFilterButton in PriceTable.jsx. Visual
-   language matches the Ring's existing info-tooltip popover
-   (bg-raised/line border/4px radius/monospace), the one other popover
-   this app already has, rather than inventing a second one. */
+   its sort button — see ColumnFilterButton in PriceTable.jsx. Rendered
+   as a small grey chip (not just a bare glyph) so it reads immediately
+   as "click here for options", the same visual convention Excel itself
+   uses, rather than something that has to be discovered by hovering
+   every header. The menu itself is portaled to document.body and
+   positioned via inline style (position: fixed, top/left computed from
+   the trigger's real position) — see ColumnFilterButton — so only its
+   own appearance (background/border/spacing/typography) lives here,
+   not its position. */
 .column-filter {
-  position: relative;
   display: inline-block;
   margin-left: 4px;
 }
 
 .column-filter-trigger {
-  background: none;
+  background: var(--line);
   border: none;
+  border-radius: 3px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1;
-  padding: 0 2px;
+  padding: 4px 5px;
   cursor: pointer;
 }
 
 .column-filter-trigger:hover,
 .column-filter-trigger:focus-visible {
-  color: var(--text);
+  background: var(--text-muted);
+  color: var(--bg);
 }
 
 /* Same "only shown once it means something" idea as the sort arrow
@@ -683,14 +699,12 @@ h1 {
    in and bolder once a filter is actually narrowing the rows, so which
    columns are filtered is visible without opening each menu to check. */
 .column-filter-trigger.active {
-  color: var(--text);
+  background: var(--text);
+  color: var(--bg);
   font-weight: 700;
 }
 
 .column-filter-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
   min-width: 130px;
   display: flex;
   flex-direction: column;
@@ -700,7 +714,7 @@ h1 {
   border-radius: 4px;
   padding: 4px;
   font-weight: 400;
-  z-index: 5;
+  z-index: 50;
 }
 
 .column-filter-option {
