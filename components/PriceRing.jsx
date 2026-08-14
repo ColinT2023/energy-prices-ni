@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
+import { useDataCoverage } from "../hooks/useDataCoverage";
 import { dayRange, TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
 import {
   londonMidnightUtc,
@@ -100,25 +101,13 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   const [selectedDate, setSelectedDate] = useState(() => londonYmd(new Date()));
   const isToday = selectedDate === todayYmd;
 
-  // Earliest navigable day — fetched once, not hardcoded, so this tracks
-  // wherever the backfill/ingestion actually starts rather than an
-  // assumed season-start date.
-  const [earliestDate, setEarliestDate] = useState(null);
-  useEffect(() => {
-    if (!supabase) return;
-    let cancelled = false;
-    supabase
-      .from("ni_prices")
-      .select("datetime")
-      .order("datetime", { ascending: true })
-      .limit(1)
-      .then(({ data }) => {
-        if (!cancelled && data && data[0]) setEarliestDate(londonYmd(new Date(data[0].datetime)));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Earliest navigable day — shared with the chart's "All time" caption
+  // and the Help page's coverage note via useDataCoverage, rather than
+  // this component keeping its own independent copy of the same query.
+  // Not hardcoded, so this tracks wherever the backfill/ingestion
+  // actually starts rather than an assumed season-start date.
+  const { earliest: earliestDatetime } = useDataCoverage();
+  const earliestDate = earliestDatetime ? londonYmd(new Date(earliestDatetime)) : null;
 
   // Latest date actually present in ni_prices — day ahead auctions publish
   // in the afternoon for the *next* day's delivery, so by evening this can

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useDataCoverage } from "../hooks/useDataCoverage";
 import {
   aggregateDaily,
   dayAheadSeries,
@@ -16,6 +17,7 @@ import {
   formatLongDate,
   londonYmd,
   londonMidnightUtc,
+  daySpanCount,
 } from "../lib/londonTime";
 
 // SVG stop-color doesn't reliably resolve CSS custom properties across
@@ -382,6 +384,19 @@ export default function PriceHistoryChart({
     [dayAheadPoints, intradayPoints]
   );
 
+  // The dataset's real extent, not the currently-viewed scope's own span
+  // (already visible from the x-axis itself) — shown only alongside the
+  // aggregation note (All time/wide Custom), where "how far back does
+  // this site's data actually go" is the relevant question. Same
+  // earliest/latest this hook also feeds the Ring's date picker and the
+  // Help page's coverage note, not a separate calculation of the same
+  // fact three times over.
+  const { earliest: coverageEarliest, latest: coverageLatest } = useDataCoverage();
+  const coverageText =
+    coverageEarliest && coverageLatest
+      ? `Spanning ${dayLabel(new Date(coverageEarliest).getTime())} – ${dayLabel(new Date(coverageLatest).getTime())} (${daySpanCount(coverageEarliest, coverageLatest)} days).`
+      : null;
+
   const [activeIndex, setActiveIndex] = useState(null);
   const activePoint = activeIndex != null ? tooltipPoints[activeIndex] : null;
 
@@ -566,7 +581,12 @@ export default function PriceHistoryChart({
             Latest intraday, coloured by price
           </span>
         )}
-        {isAggregated && <span className="chart-aggregation-note">Showing daily averages — select Today or 7 day for half-hourly detail.</span>}
+        {isAggregated && (
+          <span className="chart-aggregation-note">
+            Showing daily averages — select Today or 7 day for half-hourly detail.
+            {coverageText ? ` ${coverageText}` : ""}
+          </span>
+        )}
         {hasProvisional && <span className="chart-provisional-note">Dashed = provisional, not yet official.</span>}
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { BAND_EXPLANATION, PROVISIONAL_EXPLANATION } from "../../lib/priceSeries";
+import DataCoverageNote from "../../components/DataCoverageNote";
 
 export const metadata = {
   title: "Help — NI Energy Prices",
@@ -172,6 +173,7 @@ export default function HelpPage() {
           any financial decision, always check a live supplier tariff or SEMOpx&rsquo;s
           own published data if a decision depends on it.
         </p>
+        <DataCoverageNote />
       </section>
     </div>
   );
