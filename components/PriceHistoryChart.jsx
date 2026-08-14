@@ -10,6 +10,7 @@ import {
   gbpToPence,
   formatPence,
   formatGbp,
+  AUCTION_LABEL,
 } from "../lib/priceSeries";
 import {
   formatLondonTime,
@@ -37,6 +38,11 @@ function toPoints(rows) {
     priceGbp: row.price_gbp,
     band: row.band,
     provisional: !!row.provisional,
+    // Only meaningful for a genuine single-period point — aggregateDaily's
+    // output has no per-source-auction field (a day's average can blend
+    // several different auctions), so this is undefined there, same as
+    // any other row shape that doesn't carry one.
+    auction: row.auction,
   }));
 }
 
@@ -248,6 +254,7 @@ function buildTooltipPoints(dayAheadPoints, intradayPoints) {
       intraday: null,
       intradayGbp: null,
       intradayProvisional: false,
+      intradayAuction: null,
     });
   }
   for (const p of intradayPoints) {
@@ -256,6 +263,7 @@ function buildTooltipPoints(dayAheadPoints, intradayPoints) {
       existing.intraday = p.price;
       existing.intradayGbp = p.priceGbp;
       existing.intradayProvisional = p.provisional;
+      existing.intradayAuction = p.auction;
     } else {
       byTime.set(p.t, {
         t: p.t,
@@ -265,6 +273,7 @@ function buildTooltipPoints(dayAheadPoints, intradayPoints) {
         intraday: p.price,
         intradayGbp: p.priceGbp,
         intradayProvisional: p.provisional,
+        intradayAuction: p.auction,
       });
     }
   }
@@ -292,6 +301,16 @@ function periodLabel(t) {
   return `${formatLondonDateTime(t)}–${formatLondonTime(t + 30 * 60000)}`;
 }
 
+/** "Intraday 1"/"Intraday 2"/"Intraday 3" for the visible tooltip — same
+ * AUCTION_LABEL ("intraday 1" etc.) the rest of the site already uses,
+ * just capitalised to match "Day ahead"'s casing alongside it. Falls
+ * back to the generic "Intraday" for an aggregated point, which has no
+ * single source auction (a day's average can blend more than one). */
+function intradayDisplayLabel(auction) {
+  const label = auction && AUCTION_LABEL[auction];
+  return label ? label[0].toUpperCase() + label.slice(1) : "Intraday";
+}
+
 /** "12 Aug 2026" for an aggregated daily point — a half-hourly range
  * reads as false precision once a point actually represents a day's
  * average. */
@@ -312,8 +331,14 @@ function tooltipText(point, isAggregated) {
     );
   }
   if (point.intraday != null) {
+    // The specific auction that won the cascade for this exact point, not
+    // just "intraday" generically — the composite line can switch which
+    // underlying auction it's drawing from at different points across the
+    // day, so knowing which one applies here is what lets someone
+    // cross-check this exact value against SEMOpx's own per-auction tabs.
+    const intradayLabel = (point.intradayAuction && AUCTION_LABEL[point.intradayAuction]) || "intraday";
     parts.push(
-      `intraday ${formatPence(point.intradayGbp)}p · £${formatGbp(point.intradayGbp)}/MWh${suffix}${point.intradayProvisional ? " (provisional)" : ""}`
+      `${intradayLabel} ${formatPence(point.intradayGbp)}p · £${formatGbp(point.intradayGbp)}/MWh${suffix}${point.intradayProvisional ? " (provisional)" : ""}`
     );
   }
   return parts.join(" · ");
@@ -531,7 +556,8 @@ export default function PriceHistoryChart({
               {activePoint.intraday != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--average)" }} />
-                  Intraday {formatPence(activePoint.intradayGbp)}p · £{formatGbp(activePoint.intradayGbp)}/MWh
+                  {intradayDisplayLabel(activePoint.intradayAuction)} · {formatPence(activePoint.intradayGbp)}p · £
+                  {formatGbp(activePoint.intradayGbp)}/MWh
                   {isAggregated ? " avg" : ""}
                   {activePoint.intradayProvisional ? " · provisional" : ""}
                 </div>
