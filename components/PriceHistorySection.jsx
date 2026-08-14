@@ -159,8 +159,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
       </div>
 
       <p className="controls-explainer">
-        Date range and view are independent choices below. Chart series depends on date range too — Tomorrow and Both
-        only apply while viewing Today.
+        Choose a date range, then a view. Tomorrow and Both are only available while viewing Today.
       </p>
 
       <div className="section-controls">
