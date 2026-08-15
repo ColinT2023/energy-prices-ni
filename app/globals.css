@@ -117,6 +117,24 @@ svg .ring-segment:focus-visible {
   color: var(--text);
 }
 
+/* Same grey-chip language as .column-menu-trigger (var(--line) fill,
+   same radius, invert to var(--text-muted)/var(--bg) on hover) — reused
+   here so Help reads as more prominent than the plain-text Home link
+   without introducing a new colour or motion, keeping colour reserved
+   for price meaning only. */
+.site-nav .nav-chip {
+  background: var(--line);
+  border-radius: 3px;
+  padding: 4px 8px;
+  color: var(--text-muted);
+}
+
+.site-nav .nav-chip:hover,
+.site-nav .nav-chip:focus-visible {
+  background: var(--text-muted);
+  color: var(--bg);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .pulse-segment {
     animation: pulse 2.4s ease-in-out infinite;
@@ -643,19 +661,6 @@ h1 {
   color: var(--peak);
 }
 
-/* Same restrained, always-visible caption style as .chart-provisional-note
-   (font-family/size/colour/italic) — the table's own equivalent, shown
-   permanently above it whenever the table is the active view (see
-   PriceHistorySection.jsx), not gated on whether tomorrow's date
-   currently happens to be among the displayed rows. */
-.table-tomorrow-caption {
-  font-family: var(--font-mono), monospace;
-  font-size: 11px;
-  color: var(--text-muted);
-  font-style: italic;
-  margin: 0 0 8px;
-}
-
 .table-scroll {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -871,9 +876,9 @@ h1 {
    reading — same small-caps label language as .control-group-label
    (the Chart series/Date range group labels) for the heading, and the
    same italic treatment already used sitewide for an auxiliary note
-   (.chart-provisional-note, .table-tomorrow-caption) for the paragraph
-   itself. Two visual signals plus the wording ("say", "might show",
-   "would then be") rather than one, so it can't be skimmed as real data. */
+   (.chart-provisional-note) for the paragraph itself. Two visual signals
+   plus the wording ("say", "might show", "would then be") rather than
+   one, so it can't be skimmed as real data. */
 .glossary-example-label {
   font-family: var(--font-mono), monospace;
   font-size: 10px;

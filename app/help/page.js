@@ -20,9 +20,9 @@ const TERCILE_EXPLANATION_PARAGRAPHS = [
 // small "Example figures" label (same visual language as the control-
 // group labels above the Chart/Date range toggles) plus italics (the
 // same treatment already used sitewide for an auxiliary note — see
-// .chart-provisional-note, .table-tomorrow-caption) — two independent
-// signals, on top of the wording itself, that these are illustrative
-// numbers, not an actual past day's prices.
+// .chart-provisional-note) — two independent signals, on top of the
+// wording itself, that these are illustrative numbers, not an actual
+// past day's prices.
 const TERCILE_WORKED_EXAMPLE =
   "For example, say the half-hourly prices over the last 7 days mostly ranged between £90/MWh and £200/MWh. Sorting all of those prices and finding the cut-off points might show the bottom third ends at £120/MWh and the top third begins at £160/MWh. A price of £105/MWh this half hour would then be labelled low, £145/MWh would be typical, and £185/MWh would be peak. Those two cut-off figures shift day to day as the trailing 7-day window moves, so “typical” always reflects genuinely recent prices, not a fixed benchmark.";
 

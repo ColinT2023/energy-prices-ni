@@ -40,7 +40,9 @@ export default function RootLayout({ children }) {
           </Link>
           <nav className="site-nav">
             <Link href="/">Home</Link>
-            <Link href="/help">Help</Link>
+            <Link href="/help" className="nav-chip">
+              Help
+            </Link>
           </nav>
         </header>
         <main>{children}</main>

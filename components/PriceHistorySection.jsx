@@ -230,7 +230,8 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
       </div>
 
       <p className="controls-explainer">
-        Choose a date range, then a view. Tomorrow and Both are only available while viewing Today.
+        Choose a date range, then a view. Tomorrow and Both are only available while viewing Today.{" "}
+        <strong>Note:</strong> {TOMORROW_TABLE_CAPTION}
       </p>
 
       <div className="section-controls">
@@ -336,19 +337,16 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
           emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
         />
       ) : (
-        <>
-          <p className="table-tomorrow-caption">{TOMORROW_TABLE_CAPTION}</p>
-          <PriceTable
-            rows={tableRows}
-            hasProvisional={hasProvisionalInRange}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={handleSort}
-            onSortSelect={handleSortSelect}
-            filters={filters}
-            onFilterChange={handleFilterChange}
-          />
-        </>
+        <PriceTable
+          rows={tableRows}
+          hasProvisional={hasProvisionalInRange}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={handleSort}
+          onSortSelect={handleSortSelect}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+        />
       )}
     </div>
   );
