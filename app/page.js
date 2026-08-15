@@ -16,7 +16,17 @@ export default function HomePage() {
   return (
     <div className="page-wrap">
       <div className="eyebrow-row">
-        <p className="eyebrow">NI Electricity · SEM Auctions</p>
+        <p className="eyebrow">
+          NI Electricity · SEM Auctions · Source:{" "}
+          <a
+            href="https://www.semopx.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="external-link"
+          >
+            SEMOpx
+          </a>
+        </p>
         <DataAsOf />
       </div>
       <h1>Northern Ireland energy prices</h1>

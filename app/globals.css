@@ -956,3 +956,19 @@ dl {
 .linkedin-link:hover {
   color: var(--text);
 }
+
+/* Shared affordance for the three SEMOpx source links (eyebrow, footer
+   disclaimer, Help glossary term) — brighter than the surrounding muted
+   text plus an underline, so it reads as clickable at a glance rather
+   than just a colour shift. A standard link affordance, not a new
+   colour meaning, so it doesn't touch the blue/gold/magenta price-band
+   system used elsewhere. */
+.external-link {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.external-link:hover,
+.external-link:focus-visible {
+  opacity: 0.8;
+}

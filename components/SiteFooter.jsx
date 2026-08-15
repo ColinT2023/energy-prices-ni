@@ -26,10 +26,19 @@ export default function SiteFooter() {
   return (
     <footer className="site-footer">
       <p className="footnote">
-        This site shows real auction results from SEMOpx, not an estimate or a
-        forecast. Prices are pulled and converted automatically, so treat the
-        figures as informational. Don&rsquo;t use this site as the sole basis for
-        switching tariff, timing large energy use, or any financial decision.
+        This site shows real auction results from{" "}
+        <a
+          href="https://www.semopx.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="external-link"
+        >
+          SEMOpx
+        </a>
+        , not an estimate or a forecast. Prices are pulled and converted
+        automatically, so treat the figures as informational. Don&rsquo;t use
+        this site as the sole basis for switching tariff, timing large energy
+        use, or any financial decision.
       </p>
       <p className="footnote">
         Turning on &ldquo;Show provisional prices&rdquo; shows figures sourced from an

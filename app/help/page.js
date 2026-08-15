@@ -36,6 +36,7 @@ const SECTIONS = [
       },
       {
         term: "SEMOpx",
+        termHref: "https://www.semopx.com/",
         body: "The company that runs the day ahead and intraday auctions for the SEM. All the price data on this site comes from SEMOpx's published auction results.",
       },
       {
@@ -186,9 +187,22 @@ export default function HelpPage() {
             </>
           )}
           <dl>
-            {section.terms.map(({ term, body }) => (
+            {section.terms.map(({ term, termHref, body }) => (
               <div key={term} className="glossary-entry">
-                <dt className="glossary-term">{term}</dt>
+                <dt className="glossary-term">
+                  {termHref ? (
+                    <a
+                      href={termHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="external-link"
+                    >
+                      {term}
+                    </a>
+                  ) : (
+                    term
+                  )}
+                </dt>
                 <dd className="glossary-body">{body}</dd>
               </div>
             ))}
