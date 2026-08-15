@@ -9,15 +9,21 @@ import { COLUMNS, STATUS_COLUMN, SORT_DIRECTION_OPTIONS, hasActiveFilters } from
 const BAND_COLOUR = { low: "var(--low)", average: "var(--average)", peak: "var(--peak)" };
 
 /** Excel AutoFilter-style dropdown embedded in a column header — a small
- * ▼ chip trigger opening a short options menu. Shared by two callers
- * below: per-value filtering (ColumnFilterButton, on Auction/Band/
- * Status) and the sort-direction menu (ColumnSortButton, on Settlement
- * period/Price (p/kWh)/Price (£/MWh)) — one trigger, one menu, one
- * "filled in once it's active" colour rule, so the whole header row
+ * ▼ chip trigger opening a short menu. Shared by two callers below:
+ * per-value filtering (ColumnFilterButton, on Auction/Band/Status) and
+ * the sort-direction menu (ColumnSortButton, on Settlement period/
+ * Price (p/kWh)/Price (£/MWh)) — one trigger, one positioning system,
+ * one "filled in once it's active" colour rule, so the whole header row
  * reads as one system rather than a filter affordance and a sort
  * affordance that happen to look alike. Only one menu is open at a time
- * across both kinds (openKey/setOpenKey lifted to the table), closed by
- * picking an option, clicking outside, Escape, or scrolling.
+ * across both kinds (openKey/setOpenKey lifted to the table).
+ *
+ * The menu *body* is fully owned by the caller via renderMenu({close})
+ * — the two callers need genuinely different interaction models (sort
+ * picks one option and closes immediately; filter is a checkbox list
+ * that stays open across several edits and closes only on its own
+ * Apply action), so only the trigger/portal/positioning/dismissal
+ * mechanics are shared here, not the content.
  *
  * The menu itself is portaled to document.body and positioned with
  * `position: fixed` from the trigger's real getBoundingClientRect(),
@@ -30,8 +36,12 @@ const BAND_COLOUR = { low: "var(--low)", average: "var(--average)", peak: "var(-
  * view. Escaping via a portal sidesteps that clipping ancestor
  * entirely — the same fix shape as the earlier chart-tooltip overflow
  * issue, which needed to escape its own anchor's constraints the same
- * way. */
-function ColumnMenuButton({ menuKey, ariaLabel, active, options, isSelected, onSelect, openKey, setOpenKey }) {
+ * way. Closing any way other than the menu's own commit action (click
+ * outside, Escape, scroll) discards whatever wasn't explicitly applied
+ * — for the filter menu specifically, that means unapplied checkbox
+ * edits are abandoned, same as dismissing a real Excel AutoFilter
+ * dropdown without pressing OK. */
+function ColumnMenuButton({ menuKey, ariaLabel, active, openKey, setOpenKey, menuRole = "menu", renderMenu }) {
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const isOpen = openKey === menuKey;
@@ -44,25 +54,44 @@ function ColumnMenuButton({ menuKey, ariaLabel, active, options, isSelected, onS
   }, [isOpen]);
 
   // Now that the menu escapes .table-scroll, the viewport edge is the
-  // only boundary left to respect — clamp leftward once the real
-  // rendered width is known, same measure-then-correct approach as the
-  // tooltip fix (a guessed width can't account for actual content).
+  // only boundary left to respect — clamp leftward/upward once the real
+  // rendered size is known, same measure-then-correct approach as the
+  // tooltip fix (a guessed size can't account for actual content).
+  // Vertical clamping specifically matters now that filter menus are a
+  // checkbox list (up to 6 rows + Apply) rather than a 2-option sort
+  // menu — tall enough, opened low enough on a short mobile viewport,
+  // to render its Apply button below the fold with no way to reach it.
+  // Flips above the trigger first (like a native <select>/AutoFilter
+  // dropdown would), falling back to clamping against the bottom edge
+  // only if flipping still wouldn't fit either.
   useLayoutEffect(() => {
-    if (!isOpen || !menuRef.current || !menuPos) return;
+    if (!isOpen || !menuRef.current || !menuPos || !triggerRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
+    const triggerRect = triggerRef.current.getBoundingClientRect();
     const margin = 8;
+
     let left = menuPos.left;
     const overflowRight = rect.right - (window.innerWidth - margin);
     if (overflowRight > 0) left -= overflowRight;
     if (left < margin) left = margin;
-    if (left !== menuPos.left) {
-      setMenuPos((pos) => (pos ? { ...pos, left } : pos));
+
+    let top = menuPos.top;
+    const overflowBottom = rect.bottom - (window.innerHeight - margin);
+    if (overflowBottom > 0) {
+      const flippedTop = triggerRect.top - rect.height - 6;
+      top = flippedTop >= margin ? flippedTop : Math.max(margin, window.innerHeight - margin - rect.height);
     }
-    // menuPos.left is intentionally the only menuPos field depended on —
-    // depending on the whole object would re-run this every time it sets
-    // left, looping.
+
+    if (left !== menuPos.left || top !== menuPos.top) {
+      setMenuPos((pos) => (pos ? { ...pos, left, top } : pos));
+    }
+    // menuPos.left/top are intentionally the only menuPos fields
+    // depended on — depending on the whole object would re-run this
+    // every time it sets either, looping. Settles in at most two passes:
+    // the second run measures the already-corrected position, finds no
+    // further overflow, and makes no further change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, menuPos && menuPos.left]);
+  }, [isOpen, menuPos && menuPos.left, menuPos && menuPos.top]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -110,25 +139,11 @@ function ColumnMenuButton({ menuKey, ariaLabel, active, options, isSelected, onS
         createPortal(
           <span
             className="column-menu-list"
-            role="menu"
+            role={menuRole}
             ref={menuRef}
             style={{ position: "fixed", top: menuPos.top, left: menuPos.left }}
           >
-            {options.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                role="menuitemradio"
-                aria-checked={isSelected(opt.value)}
-                className={isSelected(opt.value) ? "column-menu-option active" : "column-menu-option"}
-                onClick={() => {
-                  onSelect(opt.value);
-                  setOpenKey(null);
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {renderMenu({ close: () => setOpenKey(null) })}
           </span>,
           document.body
         )}
@@ -136,17 +151,90 @@ function ColumnMenuButton({ menuKey, ariaLabel, active, options, isSelected, onS
   );
 }
 
-function ColumnFilterButton({ column, value, onChange, openKey, setOpenKey }) {
+/** Excel's own AutoFilter checkbox-list behaviour: every value starts
+ * checked, unchecking narrows to an OR of whatever's still checked, and
+ * unchecking everything is a deliberate "show nothing" rather than
+ * silently reverting to "show everything" (see filterRows in
+ * lib/priceTableView.js — this component only ever hands it whatever
+ * Set the checkboxes actually resolve to). Edits are held in local
+ * `pending` state and only committed via Apply, matching Excel's own
+ * OK-to-commit pattern rather than filtering live on every click — this
+ * remounts fresh (and so re-syncs to the real applied `selected`) each
+ * time the menu opens, since ColumnMenuButton only renders it while
+ * open. "(Select all)" is genuinely tri-state (checked/unchecked/
+ * indeterminate), same as real Excel's own master checkbox — plain
+ * `checked` alone can't express "some but not all", so its DOM
+ * `.indeterminate` property is set imperatively via a ref. */
+function FilterCheckboxList({ options, selected, onApply, close }) {
+  const [pending, setPending] = useState(selected);
+  const selectAllRef = useRef(null);
+
+  const allChecked = pending.size === options.length;
+  const noneChecked = pending.size === 0;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = !allChecked && !noneChecked;
+    }
+  }, [allChecked, noneChecked]);
+
+  function toggleValue(value) {
+    setPending((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setPending(allChecked ? new Set() : new Set(options.map((o) => o.value)));
+  }
+
+  return (
+    <>
+      <label className="column-menu-checkbox column-menu-select-all">
+        <input type="checkbox" ref={selectAllRef} checked={allChecked} onChange={toggleSelectAll} />
+        (Select all)
+      </label>
+      {options.map((opt) => (
+        <label key={opt.value} className="column-menu-checkbox">
+          <input type="checkbox" checked={pending.has(opt.value)} onChange={() => toggleValue(opt.value)} />
+          {opt.label}
+        </label>
+      ))}
+      <button
+        type="button"
+        className="column-menu-apply"
+        onClick={() => {
+          onApply(pending);
+          close();
+        }}
+      >
+        Apply
+      </button>
+    </>
+  );
+}
+
+function ColumnFilterButton({ column, selected, onChange, openKey, setOpenKey }) {
+  const active = selected.size !== column.filterOptions.length;
   return (
     <ColumnMenuButton
       menuKey={`filter:${column.key}`}
       ariaLabel={`Filter ${column.label}`}
-      active={value !== "all"}
-      options={column.filterOptions}
-      isSelected={(v) => v === value}
-      onSelect={(v) => onChange(column.key, v)}
+      active={active}
+      menuRole="group"
       openKey={openKey}
       setOpenKey={setOpenKey}
+      renderMenu={({ close }) => (
+        <FilterCheckboxList
+          options={column.filterOptions}
+          selected={selected}
+          onApply={(next) => onChange(column.key, next)}
+          close={close}
+        />
+      )}
     />
   );
 }
@@ -163,11 +251,30 @@ function ColumnSortButton({ column, sortKey, sortDir, onSelect, openKey, setOpen
       menuKey={`sort:${column.key}`}
       ariaLabel={`Sort ${column.label}`}
       active={isActiveColumn}
-      options={SORT_DIRECTION_OPTIONS}
-      isSelected={(v) => isActiveColumn && sortDir === v}
-      onSelect={(dir) => onSelect(column.key, dir)}
       openKey={openKey}
       setOpenKey={setOpenKey}
+      renderMenu={({ close }) => (
+        <>
+          {SORT_DIRECTION_OPTIONS.map((opt) => {
+            const selected = isActiveColumn && sortDir === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={selected}
+                className={selected ? "column-menu-option active" : "column-menu-option"}
+                onClick={() => {
+                  onSelect(column.key, opt.value);
+                  close();
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </>
+      )}
     />
   );
 }
@@ -209,14 +316,6 @@ export default function PriceTable({
   const [openMenuKey, setOpenMenuKey] = useState(null);
   const columns = hasProvisional ? [...COLUMNS, STATUS_COLUMN] : COLUMNS;
 
-  if (rows.length === 0) {
-    return (
-      <p className="placeholder-note">
-        {hasActiveFilters(filters) ? "No rows match the current filters." : "No data yet for this range."}
-      </p>
-    );
-  }
-
   return (
     <div className="table-scroll">
       <table className="price-table">
@@ -253,7 +352,7 @@ export default function PriceTable({
                 {col.filterOptions && (
                   <ColumnFilterButton
                     column={col}
-                    value={filters[col.key]}
+                    selected={filters[col.key]}
                     onChange={onFilterChange}
                     openKey={openMenuKey}
                     setOpenKey={setOpenMenuKey}
@@ -264,21 +363,37 @@ export default function PriceTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={`${row.datetime}-${row.market}-${row.auction}`}>
-              <td>{formatLondonDateTime(row.datetime)}</td>
-              <td>{AUCTION_LABEL[row.auction] ?? row.auction}</td>
-              <td>{formatPence(row.price_gbp)}</td>
-              <td>{formatGbp(row.price_gbp)}</td>
-              <td>
-                <span className="band-dot" style={{ background: BAND_COLOUR[row.band] }} />
-                {BAND_LABEL[row.band] ?? row.band}
+          {rows.length === 0 ? (
+            // A single-cell row, not the earlier full-component early
+            // return — that hid the header row (and with it, every
+            // filter chip) the moment a filter matched zero rows, which
+            // used to be a rare coincidence but is now a one-click
+            // reachable state (uncheck everything in a column, or AND
+            // two columns into an empty intersection). Keeping the
+            // header/chips mounted means the filter that caused this is
+            // still right there to reopen and fix.
+            <tr>
+              <td colSpan={columns.length} className="placeholder-note">
+                {hasActiveFilters(filters) ? "No rows match the current filters." : "No data yet for this range."}
               </td>
-              {hasProvisional && (
-                <td className={row.provisional ? "status-provisional" : undefined}>{row.status}</td>
-              )}
             </tr>
-          ))}
+          ) : (
+            rows.map((row) => (
+              <tr key={`${row.datetime}-${row.market}-${row.auction}`}>
+                <td>{formatLondonDateTime(row.datetime)}</td>
+                <td>{AUCTION_LABEL[row.auction] ?? row.auction}</td>
+                <td>{formatPence(row.price_gbp)}</td>
+                <td>{formatGbp(row.price_gbp)}</td>
+                <td>
+                  <span className="band-dot" style={{ background: BAND_COLOUR[row.band] }} />
+                  {BAND_LABEL[row.band] ?? row.band}
+                </td>
+                {hasProvisional && (
+                  <td className={row.provisional ? "status-provisional" : undefined}>{row.status}</td>
+                )}
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

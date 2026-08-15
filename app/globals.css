@@ -809,6 +809,11 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 4px;
+  /* Defensive fallback alongside ColumnMenuButton's flip/clamp
+     positioning — a filter column with enough options to still not fit
+     a short viewport scrolls internally rather than rendering off it. */
+  max-height: 80vh;
+  overflow-y: auto;
   /* Portaled to document.body (see ColumnMenuButton in PriceTable.jsx),
      so it's no longer inside .price-table's own font-family — without
      this, .column-menu-option's `font: inherit` picked up body's Inter
@@ -839,6 +844,59 @@ h1 {
 
 .column-menu-option.active {
   font-weight: 700;
+}
+
+/* Excel AutoFilter's checkbox list — same row shape/hover as
+   .column-menu-option above, just a native checkbox (accent-color:
+   var(--text), same convention as .provisional-toggle) instead of a
+   click-to-select label. (Select all) gets a divider under it so it
+   reads as a distinct master control, not just the first item. */
+.column-menu-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.column-menu-checkbox:hover {
+  background: var(--line);
+}
+
+.column-menu-checkbox input {
+  accent-color: var(--text);
+}
+
+.column-menu-select-all {
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+}
+
+/* The filter menu's commit action — checkbox edits are held as pending
+   state until this is clicked (see FilterCheckboxList in
+   PriceTable.jsx), so it needs to read as an action distinct from the
+   checkboxes above it, not just another list row. */
+.column-menu-apply {
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px 8px 6px;
+  cursor: pointer;
+}
+
+.column-menu-apply:hover,
+.column-menu-apply:focus-visible {
+  background: var(--line);
 }
 
 .band-dot {
