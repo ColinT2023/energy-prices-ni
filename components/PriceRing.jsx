@@ -110,10 +110,11 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   const earliestDate = earliestDatetime ? londonYmd(new Date(earliestDatetime)) : null;
 
   // Latest date actually present in ni_prices — day ahead auctions publish
-  // around midday for the *next* day's delivery, so from around midday
-  // onward this can genuinely be ahead of todayYmd. The nav ceiling below
-  // tracks whichever is later, so tomorrow becomes reachable the moment
-  // its data exists rather than being blocked by a hardcoded "today".
+  // between 12 and 1pm for the *next* day's delivery, so from around
+  // midday onward this can genuinely be ahead of todayYmd. The nav
+  // ceiling below tracks whichever is later, so tomorrow becomes
+  // reachable the moment its data exists rather than being blocked by a
+  // hardcoded "today".
   const [latestDataDate, setLatestDataDate] = useState(null);
   useEffect(() => {
     if (!supabase) return;
@@ -364,8 +365,8 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     );
   }
 
-  // Normal for part of today specifically — day-ahead publishes around
-  // midday the day before delivery, not at midnight — so that's a "check
+  // Normal for part of today specifically — day-ahead publishes between
+  // 12 and 1pm the day before delivery, not at midnight — so that's a "check
   // back later" state, not an error. A past day with nothing recorded is a
   // genuine gap, worded differently. Either way this replaces the whole
   // ring rather than leaving 48 silent grey "no data" segments. When the

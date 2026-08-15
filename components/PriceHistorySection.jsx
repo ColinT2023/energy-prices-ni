@@ -8,9 +8,8 @@ import {
   presetRange,
   customRange,
   tomorrowRange,
-  rowsIncludeTomorrow,
   TODAY_NOT_PUBLISHED_MESSAGE,
-  TOMORROW_TABLE_FOOTNOTE,
+  TOMORROW_TABLE_CAPTION,
 } from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
 import { mergeWithProvisional } from "../lib/priceSeries";
@@ -208,14 +207,6 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
     [displayRows, filters, sortKey, sortDir]
   );
 
-  // Whether the table is currently showing any of tomorrow's settlement
-  // periods — true for a Custom range reaching that far, but just as
-  // often true for 7 day/All time once tomorrow's day-ahead has actually
-  // published (their `to` is open-ended, see presetRange), not only the
-  // Custom case. Drives the "*" next to the Viewing indicator and the
-  // matching footnote above the table below.
-  const tableIncludesTomorrow = useMemo(() => rowsIncludeTomorrow(tableRows), [tableRows]);
-
   async function handleExport() {
     setExporting(true);
     try {
@@ -235,12 +226,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
     <div className="section">
       <div className="section-head">
         <h2>Price history</h2>
-        {viewingText && (
-          <p className="viewing-indicator">
-            {viewingText}
-            {view === "table" && tableIncludesTomorrow ? " *" : ""}
-          </p>
-        )}
+        {viewingText && <p className="viewing-indicator">{viewingText}</p>}
       </div>
 
       <p className="controls-explainer">
@@ -351,7 +337,7 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
         />
       ) : (
         <>
-          {tableIncludesTomorrow && <p className="table-tomorrow-note">* {TOMORROW_TABLE_FOOTNOTE}</p>}
+          <p className="table-tomorrow-caption">{TOMORROW_TABLE_CAPTION}</p>
           <PriceTable
             rows={tableRows}
             hasProvisional={hasProvisionalInRange}

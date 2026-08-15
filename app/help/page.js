@@ -1,4 +1,4 @@
-import { BAND_EXPLANATION, PROVISIONAL_EXPLANATION } from "../../lib/priceSeries";
+import { BAND_EXPLANATION, PROVISIONAL_EXPLANATION, TYPICAL_PUBLISH_TIME } from "../../lib/priceSeries";
 import DataCoverageNote from "../../components/DataCoverageNote";
 
 export const metadata = {
@@ -31,11 +31,11 @@ const SECTIONS = [
     terms: [
       {
         term: "Settlement period",
-        body: "The half hour block that every price on this site refers to, for example 13:00 to 13:30. There are 48 settlement periods in a normal day. This is the delivery time the price applies to, not when the auction that set it ran — a day ahead price for 13:00 tomorrow was set by an auction that ran earlier today, around midday, not at 13:00 itself.",
+        body: `The half hour block that every price on this site refers to, for example 13:00 to 13:30. There are 48 settlement periods in a normal day. This is the delivery time the price applies to, not when the auction that set it ran — a day ahead price for 13:00 tomorrow was set by an auction that ran earlier today, ${TYPICAL_PUBLISH_TIME}, not at 13:00 itself.`,
       },
       {
         term: "Day ahead auction (SEM-DA)",
-        body: "The main auction, held the day before and usually published by around midday, that sets a price for every half hour of the following day. This is the price most people mean when they talk about “tomorrow's electricity price”, it's known well in advance, which is what makes things like time of use tariffs possible.",
+        body: `The main auction, held the day before and usually published ${TYPICAL_PUBLISH_TIME}, that sets a price for every half hour of the following day. This is the price most people mean when they talk about “tomorrow's electricity price”, it's known well in advance, which is what makes things like time of use tariffs possible.`,
       },
       {
         term: "Intraday auctions (SEM-IDA1, SEM-IDA2, SEM-IDA3)",
