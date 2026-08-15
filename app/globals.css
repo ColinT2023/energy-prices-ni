@@ -691,9 +691,19 @@ h1 {
   white-space: nowrap;
 }
 
+/* 14px (not the more common 16px) specifically because six columns'
+   genuinely necessary content — full header labels, the sort/filter
+   chip, and Band/Status's own longest values ("Typical", "Provisional")
+   — added up to just 10px more than .table-scroll's available width at
+   a normal desktop viewport, spilling into an unwanted horizontal
+   scrollbar even though nothing here is actually oversized. Trimming
+   padding was the only lever that doesn't touch real content or the
+   page's own deliberately narrow reading width. See the mobile-only
+   rule further down for the separate, much narrower-viewport problem
+   this isn't. */
 .price-table th,
 .price-table td {
-  padding: 10px 16px;
+  padding: 10px 14px;
   text-align: left;
   border-bottom: 1px solid var(--line);
 }
