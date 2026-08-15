@@ -46,6 +46,40 @@ button:focus-visible,
   outline-offset: 2px;
 }
 
+/* Ring segments are curved SVG <path> shapes, not rectangles — outline
+   doesn't follow SVG geometry, it draws a straight-edged box around the
+   path's bounding box, so the rule above rendered as an unexpected white
+   rectangle sitting over a curved segment on keyboard focus (confirmed
+   live across Chromium/Firefox/WebKit — a real, reproducible bug, not
+   the pointer-click case originally reported, which never triggers
+   :focus-visible at all). Suppressed here and replaced with a stroke on
+   the path itself, which does follow its actual curved shape — same
+   mechanism the "now" segment's own solid stroke already uses (see the
+   stroke/strokeWidth props in PriceRing.jsx), just keyed off focus
+   instead of "this is the current period". `svg` in the selector is
+   only there to out-specificity the [tabindex] rule above regardless of
+   source order, not because it's semantically required. CSS wins over
+   an SVG presentation attribute at any specificity, so this correctly
+   overrides the segment's own inline stroke/stroke-width while focused,
+   even for the current/provisional segments' own stroke styling. */
+svg .ring-segment:focus-visible {
+  outline: none;
+  stroke: var(--text);
+  stroke-width: 3px;
+  /* Provisional/non-current segments render at reduced opacity (0.4-0.6,
+     see the path's own opacity prop in PriceRing.jsx) as a permanent
+     data-state indicator — appropriate when nothing's focused, but it
+     also dimmed this stroke down to a muted grey rather than a clearly
+     visible ring, undermining the point of a focus indicator on exactly
+     the segments (provisional/dashed) where it's most likely to be
+     navigated to for a closer look. Full opacity while actively focused
+     takes priority over that dimming, same "the focus state should
+     always win" reasoning the "now" segment's own opacity already
+     applies (never fully invisible, current always renders no lower
+     than 0.85). */
+  opacity: 1;
+}
+
 .site-header {
   max-width: 880px;
   margin: 0 auto;
@@ -711,6 +745,7 @@ h1 {
   border: none;
   border-radius: 3px;
   color: var(--text-muted);
+  font-family: var(--font-mono), monospace;
   font-size: 9px;
   line-height: 1;
   padding: 4px 5px;
@@ -743,6 +778,12 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 4px;
+  /* Portaled to document.body (see ColumnMenuButton in PriceTable.jsx),
+     so it's no longer inside .price-table's own font-family — without
+     this, .column-menu-option's `font: inherit` picked up body's Inter
+     instead of the table's Mono, the one confirmed gap in an otherwise
+     Mono-consistent table. Set once here rather than on every option. */
+  font-family: var(--font-mono), monospace;
   font-weight: 400;
   z-index: 50;
 }

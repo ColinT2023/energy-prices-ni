@@ -433,7 +433,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
                 stroke={isCurrent ? "var(--now-stroke)" : isProvisional ? BAND_COLOUR[row.band] : "none"}
                 strokeWidth={isCurrent ? 2 : isProvisional ? 1.2 : 0}
                 strokeDasharray={!isCurrent && isProvisional ? "3 2" : undefined}
-                className={isCurrent ? "pulse-segment" : undefined}
+                className={isCurrent ? "pulse-segment ring-segment" : "ring-segment"}
                 tabIndex={0}
                 aria-label={segmentTooltip(i, row)}
                 onMouseEnter={() => setActiveIndex(i)}
