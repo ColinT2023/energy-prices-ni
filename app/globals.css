@@ -867,6 +867,26 @@ h1 {
   margin: 0 0 20px;
 }
 
+/* Marks a worked-example paragraph as illustrative, not a real historical
+   reading — same small-caps label language as .control-group-label
+   (the Chart series/Date range group labels) for the heading, and the
+   same italic treatment already used sitewide for an auxiliary note
+   (.chart-provisional-note, .table-tomorrow-caption) for the paragraph
+   itself. Two visual signals plus the wording ("say", "might show",
+   "would then be") rather than one, so it can't be skimmed as real data. */
+.glossary-example-label {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+
+.glossary-example {
+  font-style: italic;
+}
+
 dl {
   margin: 0;
 }

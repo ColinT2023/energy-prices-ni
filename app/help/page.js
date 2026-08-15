@@ -6,6 +6,26 @@ export const metadata = {
   description: "How the SEM electricity market and its auctions work, and what the numbers on this site mean.",
 };
 
+// Expands on BAND_EXPLANATION's one-line summary (shared with the Ring's
+// tooltip and the Excel export, so kept terse there) with the statistical
+// concept it's actually using — this page is the one place that can
+// afford the fuller explanation.
+const TERCILE_EXPLANATION_PARAGRAPHS = [
+  "A tercile is one of three equal-sized groups you get by sorting a set of numbers from lowest to highest and splitting them into three parts. Picture sorting every runner in a race by finishing time and dividing them into three even groups, the fastest third, the middle third, and the slowest third. Each of those groups is a tercile.",
+  "We use terciles here because the banding always needs exactly three labels, low, typical, and peak. Splitting into terciles guarantees each label captures a genuine third of the recent prices, whether the week's been calm or volatile, rather than assuming prices are spread out the same way every week.",
+];
+
+// Deliberately hypothetical throughout ("say", "might show", "would then
+// be") rather than a real historical reading, and rendered under its own
+// small "Example figures" label (same visual language as the control-
+// group labels above the Chart/Date range toggles) plus italics (the
+// same treatment already used sitewide for an auxiliary note — see
+// .chart-provisional-note, .table-tomorrow-caption) — two independent
+// signals, on top of the wording itself, that these are illustrative
+// numbers, not an actual past day's prices.
+const TERCILE_WORKED_EXAMPLE =
+  "For example, say the half-hourly prices over the last 7 days mostly ranged between £90/MWh and £200/MWh. Sorting all of those prices and finding the cut-off points might show the bottom third ends at £120/MWh and the top third begins at £160/MWh. A price of £105/MWh this half hour would then be labelled low, £145/MWh would be typical, and £185/MWh would be peak. Those two cut-off figures shift day to day as the trailing 7-day window moves, so “typical” always reflects genuinely recent prices, not a fixed benchmark.";
+
 const SECTIONS = [
   {
     heading: "The market",
@@ -67,6 +87,8 @@ const SECTIONS = [
   {
     heading: "Low, typical, and peak",
     intro: BAND_EXPLANATION,
+    extraParagraphs: TERCILE_EXPLANATION_PARAGRAPHS,
+    example: TERCILE_WORKED_EXAMPLE,
     terms: [
       {
         term: "Day average",
@@ -152,6 +174,17 @@ export default function HelpPage() {
         <section key={section.heading} className="glossary-section">
           <h2>{section.heading}</h2>
           {section.intro && <p className="glossary-body">{section.intro}</p>}
+          {section.extraParagraphs?.map((paragraph, i) => (
+            <p key={i} className="glossary-body">
+              {paragraph}
+            </p>
+          ))}
+          {section.example && (
+            <>
+              <p className="glossary-example-label">Example figures</p>
+              <p className="glossary-body glossary-example">{section.example}</p>
+            </>
+          )}
           <dl>
             {section.terms.map(({ term, body }) => (
               <div key={term} className="glossary-entry">
