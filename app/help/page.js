@@ -63,6 +63,10 @@ const SECTIONS = [
         body: "Three further auctions held on the day itself, each one repricing the remaining periods of that day using more up to date information, most importantly, a better picture of how much wind is actually blowing. SEM-IDA1 is the first revision, SEM-IDA2 the second, SEM-IDA3 the third and closest to real time — a period won't necessarily have all three, but where it does, the highest-numbered one is the most current. Because Northern Ireland gets a large share of its power from wind, these auctions often move noticeably from the day ahead price.",
       },
       {
+        term: "Which intraday price is shown",
+        body: "The Ring and the chart's “Latest intraday” line show a single price per half hour — whichever of SEM-IDA3, SEM-IDA2, or SEM-IDA1 is the most recent one available for that specific period, not a fixed auction. Two neighbouring half hours can therefore come from different auctions at the same moment, if one period already has an IDA3 result and its neighbour doesn't yet. On SEMOpx's own site, where each auction has its own tab, that can look like several different numbers around the same time; this site is just showing the newest one available for each half hour individually.",
+      },
+      {
         term: "Index price",
         body: "The published clearing price from a given auction. This is what “the price” means on this site, pounds (or euros) per unit of electricity for a specific settlement period, from a specific auction.",
       },
