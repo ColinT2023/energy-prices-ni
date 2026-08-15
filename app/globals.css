@@ -62,6 +62,22 @@ button:focus-visible,
    an SVG presentation attribute at any specificity, so this correctly
    overrides the segment's own inline stroke/stroke-width while focused,
    even for the current/provisional segments' own stroke styling. */
+/* Independent of the :focus-visible rule below: a plain mouse click in
+   real Google Chrome (confirmed via a real Chrome + CDP-dispatched click,
+   not just Playwright's bundled Chromium/Firefox/WebKit) still painted
+   this same bounding-box outline, even though :focus-visible correctly
+   evaluates to false for that click. This <path> is only focusable via
+   an author-added tabindex, not a native interactive element, and
+   Chrome's own automatic focus ring for it appears to be gated on plain
+   :focus rather than :focus-visible the way it is for ordinary buttons/
+   links — so the :focus-visible-only rule below never got a chance to
+   suppress it. Resetting outline unconditionally on focus closes that
+   gap; the rule below still decides whether the stroke-based ring
+   itself should actually show. */
+svg .ring-segment:focus {
+  outline: none;
+}
+
 svg .ring-segment:focus-visible {
   outline: none;
   stroke: var(--text);
