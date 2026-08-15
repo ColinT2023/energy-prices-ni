@@ -972,3 +972,12 @@ dl {
 .external-link:focus-visible {
   opacity: 0.8;
 }
+
+/* .eyebrow's text-transform: uppercase is inherited by everything inside
+   it, including this link — SEMOpx's own name has a lowercase 'p' and
+   'x' that we don't want mangled into SEMOPX just because it happens to
+   sit inside an all-caps label. Footer and Help page links aren't inside
+   any uppercase context, so they don't need this. */
+.eyebrow .external-link {
+  text-transform: none;
+}
