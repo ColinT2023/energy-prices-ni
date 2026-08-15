@@ -4,7 +4,14 @@ import { useMemo, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
 import { useDataCoverage } from "../hooks/useDataCoverage";
-import { presetRange, customRange, tomorrowRange, TODAY_NOT_PUBLISHED_MESSAGE } from "../lib/priceRange";
+import {
+  presetRange,
+  customRange,
+  tomorrowRange,
+  rowsIncludeTomorrow,
+  TODAY_NOT_PUBLISHED_MESSAGE,
+  TOMORROW_TABLE_FOOTNOTE,
+} from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
 import { mergeWithProvisional } from "../lib/priceSeries";
 import { londonYmd, formatShortDate, formatLongDate } from "../lib/londonTime";
@@ -201,6 +208,14 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
     [displayRows, filters, sortKey, sortDir]
   );
 
+  // Whether the table is currently showing any of tomorrow's settlement
+  // periods — true for a Custom range reaching that far, but just as
+  // often true for 7 day/All time once tomorrow's day-ahead has actually
+  // published (their `to` is open-ended, see presetRange), not only the
+  // Custom case. Drives the "*" next to the Viewing indicator and the
+  // matching footnote above the table below.
+  const tableIncludesTomorrow = useMemo(() => rowsIncludeTomorrow(tableRows), [tableRows]);
+
   async function handleExport() {
     setExporting(true);
     try {
@@ -220,7 +235,12 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
     <div className="section">
       <div className="section-head">
         <h2>Price history</h2>
-        {viewingText && <p className="viewing-indicator">{viewingText}</p>}
+        {viewingText && (
+          <p className="viewing-indicator">
+            {viewingText}
+            {view === "table" && tableIncludesTomorrow ? " *" : ""}
+          </p>
+        )}
       </div>
 
       <p className="controls-explainer">
@@ -330,16 +350,19 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
           emptyMessage={scope === "today" ? TODAY_NOT_PUBLISHED_MESSAGE : undefined}
         />
       ) : (
-        <PriceTable
-          rows={tableRows}
-          hasProvisional={hasProvisionalInRange}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={handleSort}
-          onSortSelect={handleSortSelect}
-          filters={filters}
-          onFilterChange={handleFilterChange}
-        />
+        <>
+          {tableIncludesTomorrow && <p className="table-tomorrow-note">* {TOMORROW_TABLE_FOOTNOTE}</p>}
+          <PriceTable
+            rows={tableRows}
+            hasProvisional={hasProvisionalInRange}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+            onSortSelect={handleSortSelect}
+            filters={filters}
+            onFilterChange={handleFilterChange}
+          />
+        </>
       )}
     </div>
   );

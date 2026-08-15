@@ -40,10 +40,11 @@ The half hour block that every price on this site refers to, for example
 13:00 to 13:30. There are 48 settlement periods in a normal day.
 
 **Day ahead auction (DA)**
-The main auction, held the afternoon before, that sets a price for every
-half hour of the following day. This is the price most people mean when
-they talk about "tomorrow's electricity price", it's known well in
-advance, which is what makes things like time of use tariffs possible.
+The main auction, held the day before and usually published by around
+midday, that sets a price for every half hour of the following day.
+This is the price most people mean when they talk about "tomorrow's
+electricity price", it's known well in advance, which is what makes
+things like time of use tariffs possible.
 
 **Intraday auctions (IDA1, IDA2, IDA3)**
 Three further auctions held on the day itself, each one repricing the

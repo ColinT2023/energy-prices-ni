@@ -609,6 +609,19 @@ h1 {
   color: var(--peak);
 }
 
+/* Same restrained, always-visible caption style as .chart-provisional-note
+   (font-family/size/colour/italic) — the table's own equivalent, shown
+   above it whenever tableIncludesTomorrow is true (see
+   PriceHistorySection.jsx), explaining the "*" appended to the Viewing
+   indicator just above. */
+.table-tomorrow-note {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0 0 8px;
+}
+
 .table-scroll {
   overflow-x: auto;
   border: 1px solid var(--line);
