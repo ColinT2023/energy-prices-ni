@@ -11,6 +11,7 @@ call independently (download+parse separately from the pivot step, and
 report the pivot as rows ready for a Supabase upsert).
 """
 
+import re
 import time
 
 import pandas as pd
@@ -98,29 +99,70 @@ def get_ea001_report_list(start_date, sort_by="Date", order_by="ASC", page_size=
 
 def get_new_ea001_reports(watermark, page_size=100):
     """
-    Page through the EA-001 report list newest-first (sort_by=PublishTime,
-    order_by=DESC), stopping as soon as a report's PublishTime reaches the
-    given watermark — so this only ever looks back as far as needed to
-    reach already-ingested data, not the full (1,000+ and growing) report
-    history the way a Date-bounded fetch would.
+    Page through the EA-001 report list newest-first (sort_by=Date,
+    order_by=DESC), stopping once an entire page contains nothing newer
+    than the given watermark (see the stopping-condition paragraph below
+    for why not just the first such item) — so this only ever looks back
+    as far as needed to reach already-ingested data, not the full
+    (1,000+ and growing) report history the way a Date-bounded fetch
+    would.
 
-    No Date filter here at all, deliberately: SEMOpx's Date filter — even
-    combined with ExcludeDelayedPublication=0 — was found to still cap
-    results at whatever the API's "recent" cutoff is when both are
-    combined with a Date lower bound close to now, which is what caused
-    ni_prices to get permanently stuck (the incremental script's own
-    watermark landed exactly on that boundary, so every run's Date-bounded
-    query returned nothing newer, forever). Sorting the *unfiltered* list
-    by PublishTime with ExcludeDelayedPublication=0 and stopping client-
-    side once the watermark is reached avoids that entirely, verified
-    directly against the live API.
+    Sorted by Date, not PublishTime, and compared against each item's
+    filename-embedded end timestamp, not its PublishTime field — SEMOpx's
+    PublishTime is only genuine for the single most-recently-published
+    report; for every other report it's silently rewritten to a
+    clustered, non-chronological batch value (confirmed directly: 227
+    real SEM-DA reports' PublishTime values collapsed into a handful of
+    near-identical early-UTC timestamps regardless of their wildly
+    different actual publish times). Sorting or watermarking against that
+    field doesn't reliably terminate in the right place — this is what
+    silently left ni_prices stuck at 14 Aug 21:30 for hours across many
+    outwardly-"successful" scheduled runs, confirmed live against three
+    known-missing reports the live API had but ni_prices didn't.
+
+    Stopping condition is deliberately NOT "stop at the first item whose
+    end timestamp reaches the watermark" — Date is the auction's own
+    reference/delivery period, which for SEM-DA specifically is the
+    *next* day's date (one day ahead of when the report was actually
+    generated); every other auction type's Date is same-day. Sorted DESC,
+    an already-old day-ahead report (Date = its delivery day, which can
+    still be "today" or later even once stale) can land *between* two
+    genuinely-new same-day reports whose Date values bracket it — first-
+    item-stops missed a real, still-new report this way, confirmed live
+    (a stale day-ahead report's Date sat between two newer intraday
+    reports' Date values, so the walk stopped one item too soon and
+    silently skipped the older-Date one). Instead, this pages until an
+    *entire page* contains nothing newer than the watermark — since the
+    day-ahead offset can shift at most one report's sort position by
+    about a day's worth of entries, a whole 100-item page of nothing-new
+    is overwhelming safety margin against that one specific, bounded
+    interleaving case, while still terminating well short of the full
+    (1,000+ and growing) report history.
+
+    No Date *filter* here at all, deliberately (sort_by=Date is a
+    separate, unrelated parameter from a Date range filter): SEMOpx's
+    Date filter — even combined with ExcludeDelayedPublication=0 — was
+    found to still cap results at whatever the API's "recent" cutoff is
+    when both are combined with a Date lower bound close to now, which is
+    what caused ni_prices to get permanently stuck the first time around
+    (the incremental script's own watermark landed exactly on that
+    boundary, so every run's Date-bounded query returned nothing newer,
+    forever). Fetching the *unfiltered* list with ExcludeDelayedPublication=0
+    and stopping client-side once the watermark is reached avoids that
+    entirely, verified directly against the live API.
 
     watermark=None (no prior state) means every report is "new" — this
     pages through the whole history, same cost as a one-off backfill, but
     that only happens once, before any watermark exists.
 
-    Returns items oldest-to-newest (ascending PublishTime), so a caller
-    can still take items[-1]["PublishTime"] as the new watermark.
+    Returns items oldest-to-newest by fetch order, NOT guaranteed sorted
+    by end timestamp (see above — Date-order and end-timestamp-order can
+    genuinely diverge for a day-ahead report). A caller computing the new
+    watermark must take the *maximum* end timestamp across every returned
+    item, not just the last one in list order — confirmed live this
+    matters: naively taking the last item understated the correct
+    watermark by over two hours in the same real batch that motivated
+    this fix.
     """
     watermark_ts = parse_publish_time(watermark) if watermark else None
     items = []
@@ -131,7 +173,7 @@ def get_new_ea001_reports(watermark, page_size=100):
             "ExcludeDelayedPublication": 0,
             "page": page,
             "page_size": page_size,
-            "sort_by": "PublishTime",
+            "sort_by": "Date",
             "order_by": "DESC",
         }
         response = requests.get(API_URL, params=params, timeout=30)
@@ -142,14 +184,15 @@ def get_new_ea001_reports(watermark, page_size=100):
         if not page_items:
             break
 
-        reached_watermark = False
+        any_new_this_page = False
         for item in page_items:
-            if watermark_ts is not None and parse_publish_time(item["PublishTime"]) <= watermark_ts:
-                reached_watermark = True
-                break
+            end_ts = parse_resource_name_end_ts(item["ResourceName"])
+            if watermark_ts is not None and end_ts <= watermark_ts:
+                continue
             items.append(item)
+            any_new_this_page = True
 
-        if reached_watermark:
+        if not any_new_this_page:
             break
 
         total_pages = payload.get("pagination", {}).get("totalPages", 1)
@@ -159,6 +202,19 @@ def get_new_ea001_reports(watermark, page_size=100):
 
     items.reverse()  # was newest-first; callers want oldest-first
     return items
+
+
+def latest_end_ts(report_items):
+    """
+    The maximum parse_resource_name_end_ts across `report_items` — what
+    both ingest_incremental.py and backfill.py use to compute a new
+    watermark. Deliberately not "the last item in list order": Date-sort
+    order and end-timestamp order can genuinely diverge for a day-ahead
+    report (see get_new_ea001_reports' own docstring), so the true most-
+    recent report isn't reliably the last one returned. One shared
+    implementation rather than each caller re-deriving the same max.
+    """
+    return max(parse_resource_name_end_ts(item["ResourceName"]) for item in report_items)
 
 
 def parse_market_result_report(report_text, resource_name):
@@ -303,12 +359,58 @@ def price_table_to_rows(price_table):
 
 def parse_publish_time(value):
     """
-    Parse a PublishTime value into a tz-aware UTC pandas Timestamp so
-    SEMOpx API values (naive, e.g. "2026-08-11T00:00:03") and values read
-    back from Supabase (tz-aware, e.g. "2026-08-11T00:00:03+00:00") are
-    directly comparable. SEMOpx's PublishTime is UTC despite the missing
-    suffix — the report files it lists always use an explicit "Z" for the
-    same instants.
+    Parse a stored ingestion_state.last_publish_time watermark value into
+    a tz-aware UTC pandas Timestamp — Supabase always returns it tz-aware
+    (e.g. "2026-08-11T00:00:03+00:00"), but this also accepts a naive
+    value so a watermark written before this module switched its
+    watermark source from PublishTime to parse_resource_name_end_ts below
+    (naive, e.g. "2026-08-11T00:00:03") still parses correctly; either
+    way the *value itself* is just an ISO instant, format-agnostic about
+    where it came from. Not used to parse a live API PublishTime value
+    directly any more — see parse_resource_name_end_ts's own docstring
+    for why that field can't be trusted for anything but the single most-
+    recently-published report.
     """
     ts = pd.Timestamp(value)
     return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
+
+
+_RESOURCE_NAME_END_TS_RE = re.compile(r"_(\d{14})_(\d{14})\.csv$")
+
+
+def parse_resource_name_end_ts(resource_name):
+    """
+    Extract the real report-generation/publish-completion instant
+    embedded in ResourceName itself — e.g.
+    "MarketResult_SEM-DA_PWR-MRC-D+1_20260814100000_20260814105501.csv"
+    encodes a start timestamp (the auction's own reference/gate-closure
+    time) and an end timestamp (20260814105501 = 2026-08-14 10:55:01),
+    both UTC.
+
+    This is the reliable alternative to the API's own PublishTime field.
+    SEMOpx silently rewrites PublishTime to a clustered, non-chronological
+    batch value for any report other than the single most-recently-
+    published one — confirmed directly: PublishTime for 227 real SEM-DA
+    reports (every day from 31 Dec 2025 onward) collapsed into a handful
+    of near-identical early-UTC timestamps regardless of the reports'
+    actual, wildly different true publish times, while this filename-
+    embedded value matched the one report still fresh enough for the
+    API's own PublishTime to (for now) also be genuine, to the second.
+
+    Returns a tz-aware UTC pandas Timestamp — same type parse_publish_time
+    returns, so both are directly comparable wherever a watermark or sort
+    key is needed. Raises (rather than returning None) if resource_name
+    doesn't match the expected pattern: every real EA-001 "Market Results"
+    report observed follows it, so a mismatch means something about the
+    report shape has genuinely changed and is worth surfacing loudly —
+    this pipeline already fails loudly rather than silently advancing a
+    watermark past data it can't actually account for (see
+    download_and_parse_reports' own docstring for the same principle
+    applied to a different failure mode).
+    """
+    match = _RESOURCE_NAME_END_TS_RE.search(resource_name)
+    if not match:
+        raise ValueError(f"ResourceName doesn't match the expected _<start>_<end>.csv pattern: {resource_name!r}")
+    end_ts = match.group(2)
+    iso = f"{end_ts[0:4]}-{end_ts[4:6]}-{end_ts[6:8]}T{end_ts[8:10]}:{end_ts[10:12]}:{end_ts[12:14]}Z"
+    return pd.Timestamp(iso)

@@ -18,6 +18,7 @@ from ni_prices_common import (
     DEFAULT_START_DATE,
     download_and_parse_reports,
     get_ea001_report_list,
+    latest_end_ts,
     pivot_records,
     price_table_to_rows,
 )
@@ -29,10 +30,16 @@ def main():
     load_dotenv()
     supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
 
-    # Sorted by PublishTime (not Date) so the last item is genuinely the
-    # most recently published report — that's what becomes the initial
-    # ingestion watermark below.
-    report_items = get_ea001_report_list(DEFAULT_START_DATE, sort_by="PublishTime", order_by="ASC")
+    # Sort order here doesn't affect which reports get fetched (this pulls
+    # the full unconditional history, no early-stop) or the watermark
+    # computed below: that's the *maximum* end timestamp across every
+    # fetched item (latest_end_ts), not "whichever item sorts last",
+    # since a day-ahead report's Date (its delivery day, one day ahead of
+    # when it was actually generated) doesn't reliably sort last just
+    # because it's the most recently generated. Kept as Date/ASC
+    # (get_ea001_report_list's own default) as a reasonable, readable
+    # choice, not because anything here still depends on it.
+    report_items = get_ea001_report_list(DEFAULT_START_DATE, sort_by="Date", order_by="ASC")
     print(f"Found {len(report_items)} EA-001 reports from {DEFAULT_START_DATE} onwards.")
 
     records, failures = download_and_parse_reports(report_items)
@@ -59,7 +66,7 @@ def main():
         )
         return
 
-    watermark = report_items[-1]["PublishTime"] if report_items else None
+    watermark = latest_end_ts(report_items).isoformat() if report_items else None
     if watermark:
         supabase.table("ingestion_state").update({"last_publish_time": watermark}).eq("id", 1).execute()
         print(f"Initial watermark set to {watermark}.")

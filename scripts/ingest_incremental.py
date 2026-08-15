@@ -1,6 +1,6 @@
 """
 Incremental EA-001 ingestion — run every 30 minutes by
-.github/workflows/ingest.yml. Reads the last processed PublishTime from
+.github/workflows/ingest.yml. Reads the last processed watermark from
 ingestion_state, fetches only reports published after it, upserts their NI
 price rows into Supabase, and advances the watermark.
 
@@ -22,6 +22,7 @@ from supabase import create_client
 from ni_prices_common import (
     download_and_parse_reports,
     get_new_ea001_reports,
+    latest_end_ts,
     pivot_records,
     price_table_to_rows,
 )
@@ -58,7 +59,16 @@ def main():
             print(f"  {resource_name}: {error}")
         return
 
-    new_watermark = new_items[-1]["PublishTime"]
+    # The *maximum* end timestamp across new_items, not new_items[-1] —
+    # list order isn't reliably end-timestamp order (see
+    # get_new_ea001_reports' docstring), so the last item isn't
+    # necessarily the most recent one. Derived from each report's
+    # filename-embedded timestamp, not the API's PublishTime field — see
+    # parse_resource_name_end_ts's docstring for why PublishTime can't be
+    # trusted here. Using it to advance the watermark was exactly what
+    # silently left ingestion stuck for hours despite every scheduled run
+    # reporting success.
+    new_watermark = latest_end_ts(new_items).isoformat()
     supabase.table("ingestion_state").update({"last_publish_time": new_watermark}).eq("id", 1).execute()
     print(f"Watermark advanced to {new_watermark}.")
 
