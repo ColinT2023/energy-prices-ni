@@ -388,7 +388,7 @@ function tooltipText(point, isAggregated) {
   const suffix = isAggregated ? " avg" : "";
   if (point.dayAhead != null) {
     parts.push(
-      `tomorrow (day ahead) ${formatPence(point.dayAheadGbp)}p · £${formatGbp(point.dayAheadGbp)}/MWh${suffix}${point.dayAheadProvisional ? " (provisional)" : ""}`
+      `tomorrow (day ahead) ${formatPence(point.dayAheadGbp)}p/kWh · £${formatGbp(point.dayAheadGbp)}/MWh${suffix}${point.dayAheadProvisional ? " (provisional)" : ""}`
     );
   }
   if (point.intraday != null) {
@@ -399,7 +399,7 @@ function tooltipText(point, isAggregated) {
     // cross-check this exact value against SEMOpx's own per-auction tabs.
     const intradayLabel = (point.intradayAuction && AUCTION_LABEL[point.intradayAuction]) || "intraday";
     parts.push(
-      `${intradayLabel} ${formatPence(point.intradayGbp)}p · £${formatGbp(point.intradayGbp)}/MWh${suffix}${point.intradayProvisional ? " (provisional)" : ""}`
+      `${intradayLabel} ${formatPence(point.intradayGbp)}p/kWh · £${formatGbp(point.intradayGbp)}/MWh${suffix}${point.intradayProvisional ? " (provisional)" : ""}`
     );
   }
   return parts.join(" · ");
@@ -414,13 +414,13 @@ function tooltipTextForBoth(point) {
   const parts = [timeOfDayLabel(point.t)];
   if (point.dayAhead != null) {
     parts.push(
-      `tomorrow (day ahead) ${formatPence(point.dayAheadGbp)}p · £${formatGbp(point.dayAheadGbp)}/MWh${point.dayAheadProvisional ? " (provisional)" : ""}`
+      `tomorrow (day ahead) ${formatPence(point.dayAheadGbp)}p/kWh · £${formatGbp(point.dayAheadGbp)}/MWh${point.dayAheadProvisional ? " (provisional)" : ""}`
     );
   }
   if (point.intraday != null) {
     const label = (point.intradayAuction && AUCTION_LABEL[point.intradayAuction]) || "intraday";
     parts.push(
-      `today (${label}) ${formatPence(point.intradayGbp)}p · £${formatGbp(point.intradayGbp)}/MWh${point.intradayProvisional ? " (provisional)" : ""}`
+      `today (${label}) ${formatPence(point.intradayGbp)}p/kWh · £${formatGbp(point.intradayGbp)}/MWh${point.intradayProvisional ? " (provisional)" : ""}`
     );
   }
   return parts.join(" · ");
@@ -718,7 +718,7 @@ export default function PriceHistoryChart({
               {activePoint.dayAhead != null && (
                 <div>
                   <span className="chart-tooltip-swatch" style={{ background: "var(--text)" }} />
-                  {dayAheadLegendLabel} {formatPence(activePoint.dayAheadGbp)}p · £{formatGbp(activePoint.dayAheadGbp)}/MWh
+                  {dayAheadLegendLabel} {formatPence(activePoint.dayAheadGbp)}p/kWh · £{formatGbp(activePoint.dayAheadGbp)}/MWh
                   {isAggregated ? " avg" : ""}
                   {activePoint.dayAheadProvisional ? " · provisional" : ""}
                 </div>
@@ -732,7 +732,7 @@ export default function PriceHistoryChart({
                       wrong for most points it's shown next to. */}
                   <span className="chart-tooltip-swatch" style={{ background: BAND_HEX[activePoint.intradayBand] }} />
                   {isBoth ? "Today · " : ""}
-                  {intradayDisplayLabel(activePoint.intradayAuction)} · {formatPence(activePoint.intradayGbp)}p · £
+                  {intradayDisplayLabel(activePoint.intradayAuction)} · {formatPence(activePoint.intradayGbp)}p/kWh · £
                   {formatGbp(activePoint.intradayGbp)}/MWh
                   {isAggregated ? " avg" : ""}
                   {activePoint.intradayProvisional ? " · provisional" : ""}
