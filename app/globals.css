@@ -466,6 +466,26 @@ h1 {
   cursor: default;
 }
 
+/* Same defect class as svg .ring-segment:focus-visible above: these
+   hit-zone rects are only ~6-7px wide but 200px tall (one per
+   settlement period, tessellated across the whole plot width), and
+   real Chrome/Chromium paints its own automatic outline on plain
+   :focus for them — ungated by :focus-visible (which correctly
+   evaluates false for a tap) — so a mobile tap left the outline's
+   left/right edges rendering as two lines flanking the chart's own
+   genuine active-point guide line. Confirmed real Chrome/Chromium-only;
+   WebKit never showed it. Unlike the Ring segments, these rects are
+   invisible (fill="transparent") and already get a strictly clearer
+   focus indicator regardless of :focus-visible — the vertical guide
+   line plus the full tooltip, driven by the same onFocus handler that
+   sets activeIndex on hover — so resetting outline outright here (not
+   swapping in a replacement stroke) doesn't remove focus feedback, it
+   just stops a redundant, wrongly-shaped browser default from drawing
+   on top of the feedback that was already there. */
+.chart-plot svg rect:focus {
+  outline: none;
+}
+
 .chart-y-labels {
   position: absolute;
   inset: 0;
