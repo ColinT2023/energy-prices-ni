@@ -232,7 +232,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     // continuous lowercase sentence, same as "provisional, not yet
     // official" right after it.
     const bandLabel = (BAND_LABEL[row.band] ?? row.band).toLowerCase();
-    const detail = `${formatPence(row.price_gbp)}p · £${formatGbp(row.price_gbp)}/MWh · ${bandLabel}${provisionalNote}`;
+    const detail = `${formatPence(row.price_gbp)}p/kWh · £${formatGbp(row.price_gbp)}/MWh · ${bandLabel}${provisionalNote}`;
     return { label, detail };
   }
 
