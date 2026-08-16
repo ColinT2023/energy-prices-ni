@@ -517,11 +517,24 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
           </div>
           {isToday && (
             <>
+              {/* "per kWh" sits directly under the price it describes, not
+                  below the £/MWh line beneath it — the unit for the
+                  headline number needs to read as connected to that number,
+                  not to a different one first. Auction/provisional moves
+                  below £/MWh to make room; still the same .unit class
+                  reused twice (not two new classes), so the existing
+                  mobile @media rule already hides both of these below
+                  420px exactly as it hid the one combined line before —
+                  confirmed via direct before/after measurement, byte-for-
+                  byte identical .price/.mobileSummary layout on mobile. */}
+              <div className={styles.unit}>per kWh</div>
               {current && <div className={styles.gbpPrice}>£{formatGbp(current.price_gbp)}/MWh</div>}
-              <div className={styles.unit}>
-                per kWh{current ? ` · ${AUCTION_LABEL[current.auction] ?? current.auction}` : ""}
-                {current?.provisional ? " · provisional" : ""}
-              </div>
+              {current && (
+                <div className={styles.unit}>
+                  {AUCTION_LABEL[current.auction] ?? current.auction}
+                  {current.provisional ? " · provisional" : ""}
+                </div>
+              )}
               {current && (
                 // Mobile-only condensed equivalent of the gbpPrice/unit lines
                 // above — hidden on desktop, shown in place of them below
