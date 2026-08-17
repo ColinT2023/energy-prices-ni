@@ -26,6 +26,16 @@ const TERCILE_EXPLANATION_PARAGRAPHS = [
 const TERCILE_WORKED_EXAMPLE =
   "For example, say the half-hourly prices over the last 7 days mostly ranged between £90/MWh and £200/MWh. Sorting all of those prices and finding the cut-off points might show the bottom third ends at £120/MWh and the top third begins at £160/MWh. A price of £105/MWh this half hour would then be labelled low, £145/MWh would be typical, and £185/MWh would be peak. Those two cut-off figures shift day to day as the trailing 7-day window moves, so “typical” always reflects genuinely recent prices, not a fixed benchmark.";
 
+// The general boundary rule, applying to every half-hourly price site-
+// wide — not specific to daily-aggregated views, which just apply the
+// same rule to an averaged number (see "Banding on daily-aggregated
+// views" below, which references this rather than restating it).
+// Confirmed directly against ni_prices_banded's live SQL: strict < and
+// > in the case statement, percentile_cont(0.33)/(0.67) for the cutoffs
+// themselves.
+const TERCILE_BOUNDARY_RULE =
+  "To be precise: the two cutoffs are the 33rd and 67th percentiles of the trailing 7 days' half-hourly prices. A price is only low if it falls strictly below the 33rd percentile cutoff, and only peak if it falls strictly above the 67th percentile cutoff. A price landing exactly on either cutoff, or anywhere between the two, counts as typical.";
+
 const SECTIONS = [
   {
     heading: "The market",
@@ -98,6 +108,7 @@ const SECTIONS = [
     intro: BAND_EXPLANATION,
     extraParagraphs: TERCILE_EXPLANATION_PARAGRAPHS,
     example: TERCILE_WORKED_EXAMPLE,
+    afterExample: TERCILE_BOUNDARY_RULE,
     terms: [
       {
         term: "Day average",
@@ -105,7 +116,7 @@ const SECTIONS = [
       },
       {
         term: "Banding on daily-aggregated views",
-        body: "When viewing All time or a wide custom range, each point on the chart represents a full day's average price rather than one half hour. Its colour works the same way conceptually, low, typical, or peak relative to recent prices, but is calculated slightly differently: it compares that day's average price against the average of that same day's own low/peak cutoffs (the same cutoffs each half hour within it was individually judged against). So a day's colour reflects how its overall average sat relative to a typical half hour that day, not a ranking against other days. To be precise: the two cutoffs are the 33rd and 67th percentiles of the trailing 7 days' half-hourly prices. A price is only low if it falls strictly below the 33rd percentile cutoff, and only peak if it falls strictly above the 67th percentile cutoff. A price landing exactly on either cutoff, or anywhere between the two, counts as typical.",
+        body: "When viewing All time or a wide custom range, each point on the chart represents a full day's average price rather than one half hour. Its colour works the same way conceptually, low, typical, or peak relative to recent prices, but is calculated slightly differently: it compares that day's average price against the average of that same day's own low/peak cutoffs (the same cutoffs each half hour within it was individually judged against). So a day's colour reflects how its overall average sat relative to a typical half hour that day, not a ranking against other days. The same precise boundary rule above applies here too, just compared against the day's own averaged cutoffs rather than a single half hour's cutoffs.",
       },
     ],
   },
@@ -198,6 +209,7 @@ export default function HelpPage() {
               <p className="glossary-body glossary-example">{section.example}</p>
             </>
           )}
+          {section.afterExample && <p className="glossary-body">{section.afterExample}</p>}
           <dl>
             {section.terms.map(({ term, termHref, body }) => (
               <div key={term} className="glossary-entry">
