@@ -105,7 +105,7 @@ const SECTIONS = [
       },
       {
         term: "Banding on daily-aggregated views",
-        body: "When viewing All time or a wide custom range, each point on the chart represents a full day's average price rather than one half hour. Its colour works the same way conceptually, low, typical, or peak relative to recent prices, but is calculated slightly differently: it compares that day's average price against the average of that same day's own low/peak cutoffs (the same cutoffs each half hour within it was individually judged against). So a day's colour reflects how its overall average sat relative to a typical half hour that day, not a ranking against other days.",
+        body: "When viewing All time or a wide custom range, each point on the chart represents a full day's average price rather than one half hour. Its colour works the same way conceptually, low, typical, or peak relative to recent prices, but is calculated slightly differently: it compares that day's average price against the average of that same day's own low/peak cutoffs (the same cutoffs each half hour within it was individually judged against). So a day's colour reflects how its overall average sat relative to a typical half hour that day, not a ranking against other days. To be precise: the two cutoffs are the 33rd and 67th percentiles of the trailing 7 days' half-hourly prices. A price is only low if it falls strictly below the 33rd percentile cutoff, and only peak if it falls strictly above the 67th percentile cutoff. A price landing exactly on either cutoff, or anywhere between the two, counts as typical.",
       },
     ],
   },
