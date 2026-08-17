@@ -10,6 +10,16 @@ retried on the next run. That's safe rather than wasteful: ni_prices is
 upserted on (datetime, market), so re-processing an already-ingested report
 just overwrites its rows with the same values.
 
+In practice this means a single persistently-unavailable SEMOpx report
+(listed on their report API but not yet downloadable — see
+download_and_parse_reports' "report not yet available" case) freezes the
+watermark, and therefore all forward progress, until it resolves. Observed
+over 13-17 Aug 2026: this happens roughly once a day, reliably clearing
+within ~24h (see README.md's "Known pattern" section for the actual
+gap measurements and the trade-off reasoning against building a skip/
+bypass for it) — not a bug, and not something to "fix" by skipping ahead
+without re-reading that section first.
+
 Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the environment —
 set as GitHub Actions secrets in CI, or in scripts/.env for a local run.
 """

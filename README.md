@@ -60,6 +60,43 @@ Run this once, before the scheduled workflow has anything to build on top
 of. After that, `ingest_incremental.py` (run by the workflow) picks up from
 wherever the `ingestion_state` watermark left off.
 
+### Known pattern: a daily ~24h watermark stall, not a bug
+
+Observed over 5 consecutive days (13–17 Aug 2026), via `ni_prices.inserted_at`
+gaps and the workflow's own run logs: the watermark reliably freezes for
+roughly 24 hours once a day, then clears in one batch. Gaps between
+successful advances: 23.9h, 24.0h, 24.2h, 25.5h — each resolving around
+00:00–01:40 UTC, then stalling again through the following day.
+
+The cause each time: at least one SEMOpx EA-001 report (so far, `SEM-DA`
+specifically — the one report type guaranteed to appear exactly once a day)
+sits *listed* on SEMOpx's report API but its actual file content isn't
+downloadable yet (`GET .../documents/{ResourceName}` returns
+`{"errorMessage":"","code":0}` instead of CSV). `ingest_incremental.py`
+deliberately never advances the watermark past a run with any failure (see
+its docstring), so the entire batch — not just the stuck report — is
+retried every run until the stuck one finally resolves, which so far has
+always happened within about a day.
+
+This is a real, currently-accepted trade-off, not something to silently
+work around: the upside is a hard no-permanent-loss guarantee (nothing is
+ever skipped, so a report that comes back after a stall still lands
+correctly); the downside is that any single persistently-stuck report
+freezes *all* forward progress, including for unrelated newer reports that
+would otherwise succeed, for as long as it stays stuck. No bypass/skip
+mechanism exists for this on purpose — a bypass that advanced the watermark
+past a stuck report would drop it out of every future
+`get_new_ea001_reports()` query and its data would be permanently missing
+unless separately tracked, which is real added complexity that hasn't been
+judged worth it against a pattern that has fully self-healed every day so
+far.
+
+If this pattern is ever being re-investigated: check whether it's still
+resolving daily (healthy, matches this baseline) versus taking
+increasingly longer, spanning multiple auction types instead of just
+SEM-DA, or not resolving at all (worth actually addressing, unlike the
+baseline case this note describes).
+
 ## Deploying
 
 Hosted on Vercel. Connect this repo, then set the same two frontend env
