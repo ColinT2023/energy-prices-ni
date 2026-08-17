@@ -1,17 +1,20 @@
 name: Ingest NI provisional prices
 
 on:
-  # Matches the main pipeline's interval, not tighter — GitHub Actions
-  # bills each job run rounded up to a minimum of 1 minute regardless of
-  # actual duration, so trigger *count* is what drives cost, not how fast
-  # a run finishes. */5 (288 possible runs/day) would cost real money on
-  # its own even with every run being an instant no-op; */15 keeps this
-  # workflow's ceiling roughly in line with the main pipeline's. The
-  # coverage-skip check (today_fully_covered, see ingest_provisional.py)
-  # stays regardless of interval — it's still doing real work protecting
-  # the undocumented endpoint from unnecessary hits and keeping actual
-  # poll work minimal whenever a run isn't skipped, independent of the
-  # billing-floor issue this interval change addresses.
+  # Matches the main pipeline's interval, not tighter. This repo is
+  # public (confirmed directly via the GitHub API), and public repos get
+  # unlimited free Actions minutes on standard hosted runners — so
+  # billing was never actually the deciding factor here, despite this
+  # comment previously assuming otherwise. The real bottleneck, measured
+  # directly: GitHub's own scheduler already drops roughly half of this
+  # workflow's */15 triggers under load, so tightening further (e.g.
+  # */5) would mostly generate more dropped attempts rather than a
+  # proportionally faster real cadence, while adding load against the
+  # undocumented endpoint below for limited real gain. The coverage-skip
+  # check (today_fully_covered, see ingest_provisional.py) stays
+  # regardless of interval either way — it's still doing real work
+  # protecting that endpoint from unnecessary hits and keeping actual
+  # poll work minimal whenever a run isn't skipped.
   #
   # Offset 5 minutes from ingest.yml's "*/15 * * * *" (0/15/30/45),
   # deliberately, not the same slots — measured directly, both workflows
