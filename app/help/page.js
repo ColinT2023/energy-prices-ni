@@ -67,6 +67,10 @@ const SECTIONS = [
         body: "The Ring and the chart's “Latest intraday” line show a single price per half hour — whichever of SEM-IDA3, SEM-IDA2, or SEM-IDA1 is the most recent one available for that specific period, not a fixed auction. Two neighbouring half hours can therefore come from different auctions at the same moment, if one period already has an IDA3 result and its neighbour doesn't yet. On SEMOpx's own site, where each auction has its own tab, that can look like several different numbers around the same time; this site is just showing the newest one available for each half hour individually.",
       },
       {
+        term: "Does a later auction ever revise an already-elapsed period?",
+        body: "No, once a settlement period has actually happened, its displayed price is locked in permanently. Every auction, including the closest-to-real-time SEM-IDA3, always publishes for periods that haven't happened yet, never for ones that already have, since there's nothing left to trade once the electricity's already been used. For example, the price shown for 16:00-16:30 on 13 August came from SEM-IDA3 (£132.37/MWh), published at 13:15, nearly three hours before that period even began. Once 16:30 passed, no later auction ever touched that period again.",
+      },
+      {
         term: "Index price",
         body: "The published clearing price from a given auction. This is what “the price” means on this site, pounds (or euros) per unit of electricity for a specific settlement period, from a specific auction.",
       },
