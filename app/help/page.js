@@ -103,6 +103,10 @@ const SECTIONS = [
         term: "Day average",
         body: "A plain absolute figure next to the Ring's date picker, alongside (not instead of) the low/typical/peak colours above — this day's actual average price, in both units, so a day's colours (relative to its own recent week) can be read against a real number too. The day average only counts periods with a known price, it isn't adjusted or estimated for periods that haven't happened yet.",
       },
+      {
+        term: "Banding on daily-aggregated views",
+        body: "When viewing All time or a wide custom range, each point on the chart represents a full day's average price rather than one half hour. Its colour works the same way conceptually, low, typical, or peak relative to recent prices, but is calculated slightly differently: it compares that day's average price against the average of that same day's own low/peak cutoffs (the same cutoffs each half hour within it was individually judged against). So a day's colour reflects how its overall average sat relative to a typical half hour that day, not a ranking against other days.",
+      },
     ],
   },
   {
