@@ -134,20 +134,28 @@ svg .ring-segment:focus-visible {
 }
 
 /* Same grey-chip language as .column-menu-trigger (var(--line) fill,
-   same radius, invert to var(--text-muted)/var(--bg) on hover) — reused
-   here so Help reads as more prominent than the plain-text Home link
-   without introducing a new colour or motion, keeping colour reserved
-   for price meaning only. */
+   same radius) — reused here so Help reads as more prominent than the
+   plain-text Home link without introducing a new colour or motion,
+   keeping colour reserved for price meaning only. Text is var(--text),
+   not var(--text-muted): the same bright colour as the page heading and
+   the SEMOpx links, needed for legible contrast against the mid-grey
+   var(--line) chip fill — var(--text-muted) on var(--line) was too close
+   in value to read clearly. Hover escalates to a full var(--text) fill
+   with var(--bg) text (matching .column-menu-trigger.active's "full
+   contrast" language elsewhere on the page) rather than the old
+   var(--text-muted)/var(--bg) pairing, so hover still reads as a step up
+   in emphasis from the now-brighter resting state, not a dip back down
+   to the muted grey the resting state used to be. */
 .site-nav .nav-chip {
   background: var(--line);
   border-radius: 3px;
   padding: 4px 8px;
-  color: var(--text-muted);
+  color: var(--text);
 }
 
 .site-nav .nav-chip:hover,
 .site-nav .nav-chip:focus-visible {
-  background: var(--text-muted);
+  background: var(--text);
   color: var(--bg);
 }
 
