@@ -60,13 +60,21 @@ Run this once, before the scheduled workflow has anything to build on top
 of. After that, `ingest_incremental.py` (run by the workflow) picks up from
 wherever the `ingestion_state` watermark left off.
 
-### Known pattern: a daily ~24h watermark stall, not a bug
+### Known pattern: a daily watermark stall, not a bug — usually ~24h, occasionally longer
 
-Observed over 5 consecutive days (13–17 Aug 2026), via `ni_prices.inserted_at`
-gaps and the workflow's own run logs: the watermark reliably freezes for
-roughly 24 hours once a day, then clears in one batch. Gaps between
-successful advances: 23.9h, 24.0h, 24.2h, 25.5h — each resolving around
-00:00–01:40 UTC, then stalling again through the following day.
+Observed over 6 consecutive days (13–18 Aug 2026), via `ni_prices.inserted_at`
+gaps, direct polling of the actual report URL, and the workflow's own run
+logs: the watermark reliably freezes at least once a day, then clears in
+one batch. Gaps between successful advances: 23.9h, 24.0h, 24.2h, 25.5h —
+each resolving around 00:00–01:40 UTC — **then one instance (16→18 Aug)
+took ~39.5h**, confirmed by directly polling the stuck report's real CSV
+URL every 20 minutes from 2026-08-17T10:03Z until it finally returned real
+content at 2026-08-18T02:17:36Z, against a report whose own filename
+timestamp claimed generation at 2026-08-16T10:55:01Z. Revise the "usually
+~24h" expectation accordingly — it's not a hard ceiling, and a next
+occurrence running past 24h isn't on its own a sign of a new problem,
+though a *repeat* of the ~39.5h case (or worse) would be worth treating as
+the pattern genuinely getting worse rather than one long outlier.
 
 The cause each time: at least one SEMOpx EA-001 report (so far, `SEM-DA`
 specifically — the one report type guaranteed to appear exactly once a day)
@@ -75,8 +83,10 @@ downloadable yet (`GET .../documents/{ResourceName}` returns
 `{"errorMessage":"","code":0}` instead of CSV). `ingest_incremental.py`
 deliberately never advances the watermark past a run with any failure (see
 its docstring), so the entire batch — not just the stuck report — is
-retried every run until the stuck one finally resolves, which so far has
-always happened within about a day.
+retried every run until the stuck one finally resolves. That has always
+happened eventually (the ~39.5h case included) — no instance so far has
+required manual intervention — but "eventually" is no longer safely
+described as "within about a day" given that outlier.
 
 This is a real, currently-accepted trade-off, not something to silently
 work around: the upside is a hard no-permanent-loss guarantee (nothing is
