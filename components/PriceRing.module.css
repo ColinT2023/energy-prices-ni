@@ -222,6 +222,17 @@
   margin-bottom: 4px;
 }
 
+/* Same proportions as .chart-tooltip-swatch (globals.css) — a separate
+   rule since this file is CSS-modules-scoped to the Ring, not because
+   the sizing itself should differ. */
+.readoutSwatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
 /* Narrower container wraps the same worst-case content one line further
    than the 430px desktop case above — measured 74px at iPhone SE's
    206px-wide readout (the narrowest width tested), vs 60px at 430px.

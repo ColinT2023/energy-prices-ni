@@ -225,7 +225,7 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
 
   function segmentTooltipParts(index, row) {
     const label = periodLabel(dayStart.getTime() + index * 30 * 60000);
-    if (!row) return { label, detail: "no data" };
+    if (!row) return { label, detail: "no data", band: null };
     const provisionalNote = row.provisional ? " · provisional, not yet official" : "";
     // Lowercased since BAND_LABEL's values (Low/Typical/Peak) are cased
     // for standalone use (table cells, the legend) — this line is one
@@ -233,7 +233,12 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     // official" right after it.
     const bandLabel = (BAND_LABEL[row.band] ?? row.band).toLowerCase();
     const detail = `${formatPence(row.price_gbp)}p/kWh · £${formatGbp(row.price_gbp)}/MWh · ${bandLabel}${provisionalNote}`;
-    return { label, detail };
+    // band kept alongside detail (not baked into the string) so the
+    // readout can render a coloured swatch ahead of the price, same as
+    // the chart tooltip's own BAND_HEX-coloured swatch — detail alone
+    // still carries everything screen readers need via segmentTooltip
+    // below, unaffected by this.
+    return { label, detail, band: row.band };
   }
 
   // Single-string form for aria-label — screen readers don't need the
@@ -605,7 +610,12 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
             {parts && (
               <>
                 <div className={styles.readoutPeriod}>{parts.label}</div>
-                <div>{parts.detail}</div>
+                <div>
+                  {parts.band && (
+                    <span className={styles.readoutSwatch} style={{ background: BAND_COLOUR[parts.band] }} />
+                  )}
+                  {parts.detail}
+                </div>
               </>
             )}
           </div>
