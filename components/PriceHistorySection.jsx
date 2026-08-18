@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
-import { useDataCoverage } from "../hooks/useDataCoverage";
 import {
   presetRange,
   customRange,
@@ -13,7 +12,6 @@ import {
 } from "../lib/priceRange";
 import { exportToExcel } from "../lib/exportExcel";
 import { mergeWithProvisional } from "../lib/priceSeries";
-import { londonYmd, formatShortDate, formatLongDate } from "../lib/londonTime";
 import {
   toViewRows,
   filterRows,
@@ -50,55 +48,6 @@ const CHART_SERIES = [
 ];
 const CHART_SERIES_DISABLED_TITLE =
   "Only available while viewing Today — Tomorrow and Both compare against tomorrow's date specifically.";
-
-/**
- * The calendar day(s) the currently selected date scope covers, as
- * {startYmd, endYmd} — independent of chart series, since date range and
- * chart series are separate choices (even though chart series is itself
- * now constrained by date range — see CHART_SERIES above); this feeds
- * the shared "Viewing: ..." indicator, not any one button. Derived from
- * the same `range` already driving the fetch, rather than a second,
- * independently-reasoned date calculation — "full" is the one exception,
- * since `range.from` there is a sentinel far in the past, not a real
- * date, so it needs the actual coverage bounds instead (the same
- * earliest/latest the chart's own "All time" caption and the Help page
- * already use, not a separate query for the same fact).
- */
-function scopeSpan(scope, range, coverageEarliest, coverageLatest) {
-  if (scope === "full") {
-    if (!coverageEarliest || !coverageLatest) return null;
-    return { startYmd: londonYmd(new Date(coverageEarliest)), endYmd: londonYmd(new Date(coverageLatest)) };
-  }
-  if (!range) return null;
-  const startYmd = londonYmd(new Date(range.from));
-  // range.to is an exclusive boundary — stepping back a moment lands
-  // within the last calendar day actually included, rather than the one
-  // just past it. Open-ended ranges (7 day) run through "now" instead.
-  const endYmd = range.to ? londonYmd(new Date(new Date(range.to).getTime() - 1)) : londonYmd(new Date());
-  return { startYmd, endYmd };
-}
-
-/**
- * "Viewing: 14 Aug 2026 (Today)" — a single readout of the active date
- * scope, shown once above the whole control area rather than attached to
- * any one button. Only reacts to scope/range, never to chart series. A
- * single day always carries its year (reads as a complete date on its
- * own); a range only adds the year where the two ends actually differ
- * (e.g. an "All time" span crossing a year boundary) rather than on
- * every date.
- */
-function viewingLabel(scope, range, coverageEarliest, coverageLatest, scopeLabel) {
-  const span = scopeSpan(scope, range, coverageEarliest, coverageLatest);
-  if (!span) return null;
-  const { startYmd, endYmd } = span;
-  if (startYmd === endYmd) {
-    return `Viewing: ${formatLongDate(startYmd)} (${scopeLabel})`;
-  }
-  const yearsDiffer = startYmd.slice(0, 4) !== endYmd.slice(0, 4);
-  const from = yearsDiffer ? formatLongDate(startYmd) : formatShortDate(startYmd);
-  const to = yearsDiffer ? formatLongDate(endYmd) : formatShortDate(endYmd);
-  return `Viewing: ${from} – ${to} (${scopeLabel})`;
-}
 
 /**
  * Owns the Today/7 day/All time/Custom date range, the chart/table view
@@ -150,13 +99,6 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
   );
 
   const [exporting, setExporting] = useState(false);
-
-  const { earliest: coverageEarliest, latest: coverageLatest } = useDataCoverage();
-  const scopeLabel = SCOPES.find((s) => s.key === scope)?.label ?? scope;
-  const viewingText = useMemo(
-    () => viewingLabel(scope, range, coverageEarliest, coverageLatest, scopeLabel),
-    [scope, range, coverageEarliest, coverageLatest, scopeLabel]
-  );
 
   // Table sort/filter state lives here, not inside PriceTable, so the
   // export button below can read the exact same state and produce a file
@@ -226,7 +168,6 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
     <div className="section">
       <div className="section-head">
         <h2>Price history</h2>
-        {viewingText && <p className="viewing-indicator">{viewingText}</p>}
       </div>
 
       <p className="controls-explainer">

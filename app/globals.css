@@ -383,16 +383,6 @@ h1 {
   text-transform: uppercase;
 }
 
-/* Live readout of the active date scope — shown once above the whole
-   control area, deliberately never inside a series/scope button itself,
-   so it stays visibly independent of which auction type is selected. */
-.viewing-indicator {
-  font-family: var(--font-mono), monospace;
-  font-size: 12px;
-  margin: 0;
-  color: var(--text-muted);
-}
-
 .controls-explainer {
   font-size: 13px;
   color: var(--text-muted);
