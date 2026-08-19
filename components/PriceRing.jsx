@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "../lib/supabase";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
 import { useDataCoverage } from "../hooks/useDataCoverage";
@@ -109,33 +108,15 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
   const { earliest: earliestDatetime } = useDataCoverage();
   const earliestDate = earliestDatetime ? londonYmd(new Date(earliestDatetime)) : null;
 
-  // Latest date actually present in ni_prices — day ahead auctions publish
-  // between 12 and 1pm for the *next* day's delivery, so from around
-  // midday onward this can genuinely be ahead of todayYmd. The nav
-  // ceiling below tracks whichever is later, so tomorrow becomes
-  // reachable the moment its data exists rather than being blocked by a
-  // hardcoded "today".
-  const [latestDataDate, setLatestDataDate] = useState(null);
-  useEffect(() => {
-    if (!supabase) return;
-    let cancelled = false;
-    supabase
-      .from("ni_prices")
-      .select("datetime")
-      .order("datetime", { ascending: false })
-      .limit(1)
-      .then(({ data }) => {
-        if (!cancelled && data && data[0]) setLatestDataDate(londonYmd(new Date(data[0].datetime)));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Navigation ceiling — today by default, but never earlier than the
-  // actual latest date with data, so this only ever moves forward past
-  // today, never restricts below it (e.g. while ingestion is behind).
-  const navUpperBound = latestDataDate && latestDataDate > todayYmd ? latestDataDate : todayYmd;
+  // Navigation ceiling — today, permanently. The Ring never navigates to
+  // tomorrow regardless of whether real or provisional data exists for
+  // it; Tomorrow is only ever viewable via the chart's Intraday/Tomorrow/
+  // Both control (PriceHistorySection). A previous version of this let
+  // the ceiling track ni_prices' own latest date so tomorrow became
+  // reachable the moment official data existed for it — reverted back to
+  // a hard todayYmd cap per an explicit decision to keep the Ring and the
+  // chart's Tomorrow surface separate.
+  const navUpperBound = todayYmd;
 
   const range = useMemo(() => dayRange(selectedDate), [selectedDate]);
   const { rows, loading, error } = useNiPrices(range);
