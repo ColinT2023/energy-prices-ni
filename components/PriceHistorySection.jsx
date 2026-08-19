@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNiPrices } from "../hooks/useNiPrices";
 import { useProvisionalPrices } from "../hooks/useProvisionalPrices";
 import {
@@ -74,7 +74,7 @@ const CHART_SERIES_DISABLED_TITLE =
  * behave identically with respect to provisional data, not two
  * independently-reasoned-about toggle behaviours.
  */
-export default function PriceHistorySection({ provisionalEnabled = false }) {
+export default function PriceHistorySection({ provisionalEnabled = false, onEnableProvisional }) {
   const [scope, setScope] = useState("today");
   const [view, setView] = useState("chart");
   const [chartSeries, setChartSeries] = useState("intraday");
@@ -91,12 +91,46 @@ export default function PriceHistorySection({ provisionalEnabled = false }) {
   const displayRows = useMemo(() => mergeWithProvisional(rows, provisionalRows), [rows, provisionalRows]);
 
   const tomorrowRangeValue = useMemo(() => (scope === "today" ? tomorrowRange() : null), [scope]);
-  const { rows: tomorrowRows } = useNiPrices(tomorrowRangeValue);
-  const tomorrowProvisionalRows = useProvisionalPrices(provisionalEnabled, tomorrowRangeValue);
+  const { rows: tomorrowRows, loading: tomorrowLoading } = useNiPrices(tomorrowRangeValue);
+  // Fetched unconditionally — not gated by provisionalEnabled — same
+  // reason as PriceRing's own day fetch: the auto-reveal effect below
+  // needs to know whether tomorrow actually has provisional data before
+  // the toggle is on, not just after. tomorrowDisplayRows still only
+  // folds it in once provisionalEnabled is actually true, so Tomorrow
+  // never shows provisional data until the toggle (auto or manual) says so.
+  const tomorrowProvisionalRows = useProvisionalPrices(true, tomorrowRangeValue);
   const tomorrowDisplayRows = useMemo(
-    () => mergeWithProvisional(tomorrowRows, tomorrowProvisionalRows),
-    [tomorrowRows, tomorrowProvisionalRows]
+    () => (provisionalEnabled ? mergeWithProvisional(tomorrowRows, tomorrowProvisionalRows) : tomorrowRows),
+    [tomorrowRows, tomorrowProvisionalRows, provisionalEnabled]
   );
+
+  // Distinct settlement periods provisional actually has for tomorrow —
+  // read by the auto-reveal effect below, same role as PriceRing's own
+  // provisionalPeriodCount.
+  const tomorrowProvisionalPeriodCount = useMemo(
+    () => new Set(tomorrowProvisionalRows.map((row) => row.datetime)).size,
+    [tomorrowProvisionalRows]
+  );
+
+  // Same narrow auto-reveal rule as PriceRing's own effect, applied to a
+  // second surface rather than a new behaviour: while viewing Today (the
+  // only time tomorrowRangeValue is non-null), if tomorrow has genuinely
+  // zero official rows but real provisional data already exists, turn the
+  // shared toggle on so Tomorrow/Both aren't hiding data behind a manual
+  // click the moment someone selects them. Fires at most once per mount
+  // (autoEnabledRef) for the same reason as the Ring's: without the guard,
+  // a deliberate manual toggle-off would just get forced back on next
+  // render. Deferring to official the instant it lands falls out of this
+  // for free — once tomorrowRows.length > 0, the condition below stops
+  // matching, same as the Ring never needing to "undo" its own auto-reveal.
+  const tomorrowAutoEnabledRef = useRef(false);
+  useEffect(() => {
+    if (tomorrowAutoEnabledRef.current) return;
+    if (scope !== "today" || tomorrowLoading || provisionalEnabled) return;
+    if (tomorrowRows.length > 0 || tomorrowProvisionalPeriodCount === 0) return;
+    tomorrowAutoEnabledRef.current = true;
+    onEnableProvisional?.();
+  }, [scope, tomorrowLoading, provisionalEnabled, tomorrowRows, tomorrowProvisionalPeriodCount, onEnableProvisional]);
 
   const [exporting, setExporting] = useState(false);
 

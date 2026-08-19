@@ -44,7 +44,10 @@ export default function HomePage() {
         </div>
       </div>
 
-      <PriceHistorySection provisionalEnabled={provisionalEnabled} />
+      <PriceHistorySection
+        provisionalEnabled={provisionalEnabled}
+        onEnableProvisional={() => setProvisionalEnabled(true)}
+      />
     </div>
   );
 }
