@@ -1,18 +1,21 @@
 name: Ingest NI prices
 
 on:
-  # GitHub can delay or silently drop schedule-triggered runs under load
-  # (documented: "if the load is sufficiently high enough, some queued
-  # jobs may be dropped") — observed here as real cadence landing closer
-  # to hourly than the configured interval. Tightened to */15 so that even
-  # with drops, the effective gap stays closer to the original 30-minute
-  # target. Not a full fix (nothing in the workflow file can force
-  # schedule-event reliability), but proportionate: the ingestion script
-  # is watermark-based and fully catches up regardless of how long the
-  # gap between runs is, so a dropped trigger only ever adds staleness,
-  # never lost data.
-  schedule:
-    - cron: "*/15 * * * *"
+  # No `schedule:` trigger here anymore — GitHub's own scheduler was
+  # measured (this session) dropping roughly half, later closer to 80%,
+  # of this workflow's 15-minute-interval cron triggers under load, a
+  # documented GitHub Actions limitation not fixable from inside this
+  # file (see ingest-provisional.yml's own history of the same problem).
+  # Replaced with the same external Cloudflare Worker Cron Trigger
+  # (cloudflare/provisional-cron/) already used for the provisional
+  # workflow — it now dispatches this workflow too, every 5 minutes, via
+  # workflow_dispatch below, reusing the same GITHUB_DISPATCH_TOKEN
+  # (GitHub's Actions permission model is per-repository, not per
+  # workflow file, so one token already covers both). See the main
+  # README's "Provisional ingestion's real trigger" section for the full
+  # reasoning and setup. workflow_dispatch stays here regardless, both
+  # as what the Worker calls and so this can still be triggered manually
+  # if needed.
   workflow_dispatch: {}
 
 jobs:

@@ -107,23 +107,44 @@ increasingly longer, spanning multiple auction types instead of just
 SEM-DA, or not resolving at all (worth actually addressing, unlike the
 baseline case this note describes).
 
-### Provisional ingestion's real trigger: a Cloudflare Worker, not GitHub's schedule
+### Both workflows' real trigger: a Cloudflare Worker, not GitHub's schedule
 
-`ingest-provisional.yml` has no `schedule:` trigger — only `workflow_dispatch:`.
-This is deliberate: measured directly this session, GitHub's own scheduler was
-dropping roughly half (later measured closer to 80% once both ingestion
-workflows were compared side by side) of this workflow's `*/15`-interval
-triggers under load — a documented GitHub Actions limitation ("if the load is
-sufficiently high enough, some queued jobs may be dropped"), not something a
-tighter cron interval or a workflow-file change can fix from the inside.
+Neither `ingest.yml` nor `ingest-provisional.yml` has a `schedule:` trigger —
+only `workflow_dispatch:`. This is deliberate: measured directly this
+session, GitHub's own scheduler was dropping roughly half (later measured
+closer to 80% once both ingestion workflows were compared side by side) of
+their `*/15`-interval triggers under load — a documented GitHub Actions
+limitation ("if the load is sufficiently high enough, some queued jobs may be
+dropped"), not something a tighter cron interval or a workflow-file change
+can fix from the inside.
 
-Instead, a small Cloudflare Worker (`cloudflare/provisional-cron/`) runs on
-its own Cron Trigger every 5 minutes and calls this workflow's
-`workflow_dispatch` API directly — an endpoint that isn't subject to GitHub's
-schedule-trigger queue, so it sidesteps the drop rather than trying to
-outguess it. See `cloudflare/provisional-cron/wrangler.toml` for why 5
-minutes specifically, and `cloudflare/provisional-cron/src/index.js` for the
-dispatch call itself.
+Instead, a single Cloudflare Worker (`cloudflare/provisional-cron/`,
+`ni-provisional-cron` — named for what it originally covered, kept covering
+both rather than renamed/split once extended) runs on its own Cron Trigger
+every 5 minutes and calls **both** workflows' `workflow_dispatch` API
+directly, one POST each per firing — an endpoint that isn't subject to
+GitHub's schedule-trigger queue, so it sidesteps the drop rather than trying
+to outguess it. One shared `GITHUB_DISPATCH_TOKEN`: GitHub's Actions
+permission model (classic PAT `workflow` scope, or fine-grained PAT
+`actions: read and write`) is granted per-repository, not per workflow file,
+so the same token already covers both dispatch calls — no second secret. See
+`cloudflare/provisional-cron/wrangler.toml` for why 5 minutes specifically,
+and `cloudflare/provisional-cron/src/index.js` for both dispatch calls.
+
+**What this does and doesn't fix.** It closes the gap between GitHub's own
+schedule trigger being unreliable and a workflow actually running — for
+`ingest-provisional.yml`, that means the residual pickup delay after a report
+becomes available (confirmed directly: a real SEM-DA report published and
+fully parseable via IST=1 sat unpicked-up for ~49 minutes past a scheduled
+trigger that should have caught it, until this Worker's next firing did). It
+does **not** touch the separate, SEMOpx-side "[Known pattern: a daily
+watermark stall](#known-pattern-a-daily-watermark-stall-not-a-bug--usually-24h-occasionally-longer)"
+documented above — that stall is caused by SEMOpx's own report not being
+downloadable yet, not by the trigger failing to fire, and `ingest.yml`
+retrying more reliably now doesn't make a not-yet-downloadable report
+downloadable any sooner. The two problems are independent: this fixes
+"did the workflow actually run when it should have," not "is SEMOpx's data
+actually ready yet."
 
 This depends on two things that live outside this repo and aren't part of
 its own setup:
@@ -134,10 +155,6 @@ its own setup:
 - A **GitHub personal access token** (fine-grained, or classic with the
   `workflow` scope) with permission to dispatch workflows on this repo, used
   as that secret's value.
-
-The official "Ingest NI prices" workflow (`ingest.yml`) is untouched — it
-still uses GitHub's own `schedule:` trigger, and this Worker only ever calls
-the provisional one.
 
 ## Deploying
 
