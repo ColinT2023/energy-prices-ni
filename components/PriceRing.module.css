@@ -200,9 +200,11 @@
      a short official one — that growth is what was pushing everything
      below (legend, toggle, Price History section) up and down as hover
      moved between segments. 60px is the measured worst case across all
-     48 segments at this width (430px, "average" band + provisional,
-     wrapping to 2 lines) — see the mobile override below for the
-     narrower, tighter-wrapping case. */
+     48 segments at this width (430px, longest auction label + "typical"
+     band + provisional, wrapping to 2 lines) — re-measured after the
+     auction label was added to this line and still fits unchanged; see
+     the mobile override below for the narrower, tighter-wrapping case
+     that didn't. */
   width: 100%;
   max-width: 430px;
   height: 60px;
@@ -234,15 +236,19 @@
 }
 
 /* Narrower container wraps the same worst-case content one line further
-   than the 430px desktop case above — measured 74px at iPhone SE's
-   206px-wide readout (the narrowest width tested), vs 60px at 430px.
-   Placed after the base .readout rule deliberately: a mobile override
-   declared earlier in the file (as in the .price/.ringCentre block
-   above) loses to a same-specificity rule that comes later in the
-   cascade even when its own media query doesn't match — this one has
-   to come after .readout's base rule to actually apply here. */
+   than the 430px desktop case above — was 74px at iPhone SE's 206px-wide
+   readout, raised to 82px once the auction label was added to the same
+   line: re-measured directly (real clientHeight vs scrollHeight against
+   the actual worst-case string, same methodology as the original 74px
+   figure), confirmed the extra content pushed it to a 4th wrapped line,
+   overflowing the old height by 8px. Placed after the base .readout rule
+   deliberately: a mobile override declared earlier in the file (as in
+   the .price/.ringCentre block above) loses to a same-specificity rule
+   that comes later in the cascade even when its own media query doesn't
+   match — this one has to come after .readout's base rule to actually
+   apply here. */
 @media (max-width: 420px) {
   .readout {
-    height: 74px;
+    height: 82px;
   }
 }

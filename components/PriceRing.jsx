@@ -213,7 +213,14 @@ export default function PriceRing({ provisionalEnabled = false, onEnableProvisio
     // continuous lowercase sentence, same as "provisional, not yet
     // official" right after it.
     const bandLabel = (BAND_LABEL[row.band] ?? row.band).toLowerCase();
-    const detail = `${formatPence(row.price_gbp)}p/kWh · £${formatGbp(row.price_gbp)}/MWh · ${bandLabel}${provisionalNote}`;
+    // AUCTION_LABEL's own values are already lowercase ("intraday 2"
+    // etc.), no .toLowerCase() needed here unlike bandLabel above.
+    // Leads the line (auction · price · band · provisional), matching
+    // the Table's own column order (Settlement period, Auction, Price,
+    // Price, Band, Status) — the one other place on the site listing
+    // auction and band together.
+    const auctionLabel = AUCTION_LABEL[row.auction] ?? row.auction;
+    const detail = `${auctionLabel} · ${formatPence(row.price_gbp)}p/kWh · £${formatGbp(row.price_gbp)}/MWh · ${bandLabel}${provisionalNote}`;
     // band kept alongside detail (not baked into the string) so the
     // readout can render a coloured swatch ahead of the price, same as
     // the chart tooltip's own BAND_HEX-coloured swatch — detail alone
