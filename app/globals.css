@@ -963,6 +963,20 @@ h1 {
   border-top: 1px solid var(--line);
 }
 
+/* The one transition on the page that actually matters: from the
+   opening (Purpose/Where the data comes from/Why this matters/How to
+   use it — read this first) into technical reference (look things up as
+   needed). Thicker border and more breathing room than every other
+   section's plain 1px border-top, not a new colour or a background
+   block, so it reads as "this next part is a different tier" while
+   staying inside the site's existing restrained language rather than
+   introducing a new one. */
+.glossary-section-divider {
+  margin-top: 64px;
+  padding-top: 48px;
+  border-top: 2px solid var(--line);
+}
+
 .glossary-section h2 {
   font-family: var(--font-display), sans-serif;
   font-weight: 500;
@@ -973,6 +987,30 @@ h1 {
 .glossary-section > .glossary-body {
   max-width: 68ch;
   margin: 0 0 20px;
+}
+
+.glossary-jump-list {
+  max-width: 68ch;
+  margin: 0 0 20px;
+  padding-left: 20px;
+  color: var(--text-muted);
+}
+
+.glossary-jump-list li {
+  margin-bottom: 4px;
+}
+
+/* Same colour/underline treatment as .external-link — the site's one
+   existing "this is a link" signal — kept as its own class rather than
+   reused directly since these aren't external (no target/rel here). */
+.glossary-jump-link {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.glossary-jump-link:hover,
+.glossary-jump-link:focus-visible {
+  opacity: 0.8;
 }
 
 /* Marks a worked-example paragraph as illustrative, not a real historical

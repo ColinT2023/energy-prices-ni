@@ -39,6 +39,7 @@ const TERCILE_BOUNDARY_RULE =
 const SECTIONS = [
   {
     heading: "The market",
+    id: "the-market",
     terms: [
       {
         term: "SEM (Single Electricity Market)",
@@ -57,6 +58,7 @@ const SECTIONS = [
   },
   {
     heading: "The auctions",
+    id: "the-auctions",
     intro:
       "Electricity has to be bought and sold in advance because it can't be stored at scale, someone has to commit to generating exactly what everyone else is about to use, half hour by half hour. That commitment happens through a sequence of auctions, each one closer to real time and each one refining the price using better information. This is what the Auction column on this site shows: SEM-DA for the day ahead auction, then SEM-IDA1, SEM-IDA2, and SEM-IDA3 for the three intraday auctions that follow it, in order, a higher number always means a more recent revision.",
     terms: [
@@ -88,6 +90,7 @@ const SECTIONS = [
   },
   {
     heading: "The numbers",
+    id: "the-numbers",
     terms: [
       {
         term: "£/MWh (pounds per megawatt hour)",
@@ -105,6 +108,7 @@ const SECTIONS = [
   },
   {
     heading: "Low, typical, and peak",
+    id: "low-typical-and-peak",
     intro: BAND_EXPLANATION,
     extraParagraphs: TERCILE_EXPLANATION_PARAGRAPHS,
     example: TERCILE_WORKED_EXAMPLE,
@@ -122,6 +126,7 @@ const SECTIONS = [
   },
   {
     heading: "Provisional prices",
+    id: "provisional-prices",
     intro: PROVISIONAL_EXPLANATION,
     terms: [
       {
@@ -140,6 +145,7 @@ const SECTIONS = [
   },
   {
     heading: "Using this site",
+    id: "using-this-site",
     terms: [
       {
         term: "Browsing other days",
@@ -169,6 +175,16 @@ const SECTIONS = [
   },
 ];
 
+// Derived from SECTIONS itself, not a separately-maintained list — so a
+// future section added to SECTIONS shows up here automatically instead
+// of silently going missing from the jump list. "A note on accuracy" is
+// appended separately since it's hand-written JSX below, not part of
+// SECTIONS (same reason it was never in that array to begin with).
+const JUMP_SECTIONS = [
+  ...SECTIONS.map((section) => ({ id: section.id, label: section.heading })),
+  { id: "a-note-on-accuracy", label: "A note on accuracy" },
+];
+
 export default function HelpPage() {
   return (
     <div className="page-wrap">
@@ -176,7 +192,7 @@ export default function HelpPage() {
       <h1>Help &amp; glossary</h1>
 
       <section className="glossary-section">
-        <h2>Purpose of this dashboard</h2>
+        <h2 id="purpose">Purpose of this dashboard</h2>
         <p className="glossary-body">
           This dashboard tracks Northern Ireland&rsquo;s wholesale electricity price
           throughout the day, and compares day ahead and intraday prices to help
@@ -191,7 +207,7 @@ export default function HelpPage() {
       </section>
 
       <section className="glossary-section">
-        <h2>Where the data comes from</h2>
+        <h2 id="where-the-data-comes-from">Where the data comes from</h2>
         <p className="glossary-body">
           The prices shown are sourced from SEMOpx, the official operator of the
           day ahead and intraday electricity auctions for the Single Electricity
@@ -205,7 +221,7 @@ export default function HelpPage() {
       </section>
 
       <section className="glossary-section">
-        <h2>Why this matters compared to a supplier bill</h2>
+        <h2 id="why-this-matters">Why this matters compared to a supplier bill</h2>
         <p className="glossary-body">
           Electricity suppliers, including the major retail providers, ultimately
           trade through this same wholesale market before applying their own
@@ -218,7 +234,7 @@ export default function HelpPage() {
       </section>
 
       <section className="glossary-section">
-        <h2>How to use it</h2>
+        <h2 id="how-to-use-it">How to use it</h2>
         <p className="glossary-body">
           Today&rsquo;s Ring shows the live price at a glance, coloured low, typical,
           or peak against the last 7 days. For a fuller picture, the price
@@ -232,11 +248,31 @@ export default function HelpPage() {
           for spotting savings opportunities in the flexible portion of energy
           use, not for managing anything critical.
         </p>
+
+        {/* Plain same-page anchors, not a new visual language — reuses
+            .external-link's exact colour/underline treatment (the site's
+            one existing "this is a link" signal) via its own class only
+            because these aren't external, target/rel would be wrong.
+            Lets someone jump straight to one term instead of implying
+            the whole page below needs reading in order. */}
+        <p className="glossary-body">Jump to a section:</p>
+        <ul className="glossary-jump-list">
+          {JUMP_SECTIONS.map(({ id, label }) => (
+            <li key={id}>
+              <a href={`#${id}`} className="glossary-jump-link">
+                {label}
+              </a>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      {SECTIONS.map((section) => (
-        <section key={section.heading} className="glossary-section">
-          <h2>{section.heading}</h2>
+      {SECTIONS.map((section, index) => (
+        <section
+          key={section.heading}
+          className={index === 0 ? "glossary-section glossary-section-divider" : "glossary-section"}
+        >
+          <h2 id={section.id}>{section.heading}</h2>
           {section.intro && <p className="glossary-body">{section.intro}</p>}
           {section.extraParagraphs?.map((paragraph, i) => (
             <p key={i} className="glossary-body">
@@ -275,7 +311,7 @@ export default function HelpPage() {
       ))}
 
       <section className="glossary-section">
-        <h2>A note on accuracy</h2>
+        <h2 id="a-note-on-accuracy">A note on accuracy</h2>
         <p className="glossary-body">
           This site shows real auction results from SEMOpx, not an estimate or a
           forecast built by AI. That said, prices are pulled and converted
