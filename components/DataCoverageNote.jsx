@@ -28,7 +28,7 @@ export default function DataCoverageNote() {
   return (
     <p className="glossary-body">
       This site currently holds data from {formatLongDate(londonYmd(new Date(earliest)))} through{" "}
-      {formatLongDate(londonYmd(new Date(latest)))} ({daySpanCount(earliest, latest)} days) — the same range the
+      {formatLongDate(londonYmd(new Date(latest)))} ({daySpanCount(earliest, latest)} days): the same range the
       price history chart&rsquo;s All time view spans.
     </p>
   );

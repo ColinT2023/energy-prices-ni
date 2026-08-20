@@ -38,14 +38,14 @@ export default function SiteFooter() {
         , not an estimate or a forecast. Prices are pulled and converted
         automatically, so treat the figures as informational. Don&rsquo;t use
         this site as the sole basis for switching tariff, timing large energy
-        use, or any financial decision.
+        use or any financial decision.
       </p>
       <p className="footnote">
         Turning on &ldquo;Show provisional prices&rdquo; shows figures sourced from an
         undocumented SEMOpx feed, not yet formally published as an official
         result. They&rsquo;re real auction data, not an estimate, but per
         SEMOpx&rsquo;s own erroneous bid correction process, a provisional figure
-        could still be revised before the official one lands &mdash; treat it as
+        could still be revised before the official one lands. Treat it as
         informational only, more so than the confirmed figures above it.
       </p>
       <p className="attribution">

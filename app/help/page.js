@@ -11,8 +11,8 @@ export const metadata = {
 // concept it's actually using — this page is the one place that can
 // afford the fuller explanation.
 const TERCILE_EXPLANATION_PARAGRAPHS = [
-  "A tercile is one of three equal-sized groups you get by sorting a set of numbers from lowest to highest and splitting them into three parts. Picture sorting every runner in a race by finishing time and dividing them into three even groups, the fastest third, the middle third, and the slowest third. Each of those groups is a tercile.",
-  "We use terciles here because the banding always needs exactly three labels, low, typical, and peak. Splitting into terciles guarantees each label captures a genuine third of the recent prices, whether the week's been calm or volatile, rather than assuming prices are spread out the same way every week.",
+  "A tercile is one of three equal-sized groups you get by sorting a set of numbers from lowest to highest and splitting them into three parts. Picture sorting every runner in a race by finishing time and dividing them into three even groups, the fastest third, the middle third and the slowest third. Each of those groups is a tercile.",
+  "We use terciles here because the banding always needs exactly three labels, low, typical and peak. Splitting into terciles guarantees each label captures a genuine third of the recent prices, whether the week's been calm or volatile, rather than assuming prices are spread out the same way every week.",
 ];
 
 // Deliberately hypothetical throughout ("say", "might show", "would then
@@ -24,7 +24,7 @@ const TERCILE_EXPLANATION_PARAGRAPHS = [
 // wording itself, that these are illustrative numbers, not an actual
 // past day's prices.
 const TERCILE_WORKED_EXAMPLE =
-  "For example, say the half-hourly prices over the last 7 days mostly ranged between £90/MWh and £200/MWh. Sorting all of those prices and finding the cut-off points might show the bottom third ends at £120/MWh and the top third begins at £160/MWh. A price of £105/MWh this half hour would then be labelled low, £145/MWh would be typical, and £185/MWh would be peak. Those two cut-off figures shift day to day as the trailing 7-day window moves, so “typical” always reflects genuinely recent prices, not a fixed benchmark.";
+  "For example, say the half-hourly prices over the last 7 days mostly ranged between £90/MWh and £200/MWh. Sorting all of those prices and finding the cut-off points might show the bottom third ends at £120/MWh and the top third begins at £160/MWh. A price of £105/MWh this half hour would then be labelled low, £145/MWh would be typical and £185/MWh would be peak. Those two cut-off figures shift day to day as the trailing 7-day window moves, so “typical” always reflects genuinely recent prices, not a fixed benchmark.";
 
 // The general boundary rule, applying to every half-hourly price site-
 // wide — not specific to daily-aggregated views, which just apply the
@@ -60,11 +60,11 @@ const SECTIONS = [
     heading: "The auctions",
     id: "the-auctions",
     intro:
-      "Electricity has to be bought and sold in advance because it can't be stored at scale, someone has to commit to generating exactly what everyone else is about to use, half hour by half hour. That commitment happens through a sequence of auctions, each one closer to real time and each one refining the price using better information. This is what the Auction column on this site shows: SEM-DA for the day ahead auction, then SEM-IDA1, SEM-IDA2, and SEM-IDA3 for the three intraday auctions that follow it, in order, a higher number always means a more recent revision.",
+      "Electricity has to be bought and sold in advance because it can't be stored at scale, someone has to commit to generating exactly what everyone else is about to use, half hour by half hour. That commitment happens through a sequence of auctions, each one closer to real time and each one refining the price using better information. This is what the Auction column on this site shows: SEM-DA for the day ahead auction, then SEM-IDA1, SEM-IDA2 and SEM-IDA3 for the three intraday auctions that follow it, in order, a higher number always means a more recent revision.",
     terms: [
       {
         term: "Settlement period",
-        body: `The half hour block that every price on this site refers to, for example 13:00 to 13:30. There are 48 settlement periods in a normal day. This is the delivery time the price applies to, not when the auction that set it ran — a day ahead price for 13:00 tomorrow was set by an auction that ran earlier today, ${TYPICAL_PUBLISH_TIME}, not at 13:00 itself.`,
+        body: `The half hour block that every price on this site refers to, for example 13:00 to 13:30. There are 48 settlement periods in a normal day. This is the delivery time the price applies to, not when the auction that set it ran: a day ahead price for 13:00 tomorrow was set by an auction that ran earlier today, ${TYPICAL_PUBLISH_TIME}, not at 13:00 itself.`,
       },
       {
         term: "Day ahead auction (SEM-DA)",
@@ -72,11 +72,11 @@ const SECTIONS = [
       },
       {
         term: "Intraday auctions (SEM-IDA1, SEM-IDA2, SEM-IDA3)",
-        body: "Three further auctions held on the day itself, each one repricing the remaining periods of that day using more up to date information, most importantly, a better picture of how much wind is actually blowing. SEM-IDA1 is the first revision, SEM-IDA2 the second, SEM-IDA3 the third and closest to real time — a period won't necessarily have all three, but where it does, the highest-numbered one is the most current. Because Northern Ireland gets a large share of its power from wind, these auctions often move noticeably from the day ahead price.",
+        body: "Three further auctions held on the day itself, each one repricing the remaining periods of that day using more up to date information, most importantly, a better picture of how much wind is actually blowing. SEM-IDA1 is the first revision, SEM-IDA2 the second, SEM-IDA3 the third and closest to real time. A period won't necessarily have all three, but where it does, the highest-numbered one is the most current. Because Northern Ireland gets a large share of its power from wind, these auctions often move noticeably from the day ahead price.",
       },
       {
         term: "Which intraday price is shown",
-        body: "The Ring and the chart's “Latest intraday” line show a single price per half hour — whichever of SEM-IDA3, SEM-IDA2, or SEM-IDA1 is the most recent one available for that specific period, not a fixed auction. Two neighbouring half hours can therefore come from different auctions at the same moment, if one period already has an IDA3 result and its neighbour doesn't yet. On SEMOpx's own site, where each auction has its own tab, that can look like several different numbers around the same time; this site is just showing the newest one available for each half hour individually.",
+        body: "The Ring and the chart's “Latest intraday” line show a single price per half hour: whichever of SEM-IDA3, SEM-IDA2 or SEM-IDA1 is the most recent one available for that specific period, not a fixed auction. Two neighbouring half hours can therefore come from different auctions at the same moment, if one period already has an IDA3 result and its neighbour doesn't yet. On SEMOpx's own site, where each auction has its own tab, that can look like several different numbers around the same time; this site is just showing the newest one available for each half hour individually.",
       },
       {
         term: "Does a later auction ever revise an already-elapsed period?",
@@ -98,7 +98,7 @@ const SECTIONS = [
       },
       {
         term: "p/kWh (pence per kilowatt hour)",
-        body: "The retail unit that shows up on a household bill. This site converts wholesale £/MWh figures into p/kWh so the numbers are easier to compare against a bill, but it's worth knowing wholesale price is only one part of what a supplier charges, it doesn't include network costs, supplier margin, or green levies.",
+        body: "The retail unit that shows up on a household bill. This site converts wholesale £/MWh figures into p/kWh so the numbers are easier to compare against a bill, but it's worth knowing wholesale price is only one part of what a supplier charges, it doesn't include network costs, supplier margin or green levies.",
       },
       {
         term: "EUR and GBP",
@@ -107,7 +107,7 @@ const SECTIONS = [
     ],
   },
   {
-    heading: "Low, typical, and peak",
+    heading: "Low, typical and peak",
     id: "low-typical-and-peak",
     intro: BAND_EXPLANATION,
     extraParagraphs: TERCILE_EXPLANATION_PARAGRAPHS,
@@ -116,11 +116,11 @@ const SECTIONS = [
     terms: [
       {
         term: "Day average",
-        body: "A plain absolute figure next to the Ring's date picker, alongside (not instead of) the low/typical/peak colours above — this day's actual average price, in both units, so a day's colours (relative to its own recent week) can be read against a real number too. The day average only counts periods with a known price, it isn't adjusted or estimated for periods that haven't happened yet.",
+        body: "A plain absolute figure next to the Ring's date picker, alongside (not instead of) the low/typical/peak colours above: this day's actual average price, in both units, so a day's colours (relative to its own recent week) can be read against a real number too. The day average only counts periods with a known price, it isn't adjusted or estimated for periods that haven't happened yet.",
       },
       {
         term: "Banding on daily-aggregated views",
-        body: "When viewing All time or a wide custom range, each point on the chart represents a full day's average price rather than one half hour. Its colour works the same way conceptually, low, typical, or peak relative to recent prices, but is calculated slightly differently: it compares that day's average price against the average of that same day's own low/peak cutoffs (the same cutoffs each half hour within it was individually judged against). So a day's colour reflects how its overall average sat relative to a typical half hour that day, not a ranking against other days. The same precise boundary rule above applies here too, just compared against the day's own averaged cutoffs rather than a single half hour's cutoffs.",
+        body: "When viewing All time or a wide custom range, each point on the chart represents a full day's average price rather than one half hour. Its colour works the same way conceptually, low, typical or peak relative to recent prices, but is calculated slightly differently: it compares that day's average price against the average of that same day's own low/peak cutoffs (the same cutoffs each half hour within it was individually judged against). So a day's colour reflects how its overall average sat relative to a typical half hour that day, not a ranking against other days. The same precise boundary rule above applies here too, just compared against the day's own averaged cutoffs rather than a single half hour's cutoffs.",
       },
     ],
   },
@@ -135,11 +135,11 @@ const SECTIONS = [
       },
       {
         term: "Where it appears",
-        body: "One toggle governs all four places prices show up on this site — the Ring, the price history chart, the table, and the Excel export — and only when you turn it on, off by default. The same rule applies everywhere: official wins for any period it covers, provisional only fills in periods official hasn't reached yet. In the table and the export specifically, a Status column marks each row Official or Provisional so it's identifiable on its own, not just inferred from a dashed line. It isn't limited to today specifically — browse back a day and it can still fill in a trailing period or two that the official pipeline hadn't caught up on yet, but in practice you'll rarely see it anywhere except today and, occasionally, the tail end of yesterday.",
+        body: "One toggle governs all four places prices show up on this site (the Ring, the price history chart, the table and the Excel export), and only when you turn it on, off by default. The same rule applies everywhere: official wins for any period it covers, provisional only fills in periods official hasn't reached yet. In the table and the export specifically, a Status column marks each row Official or Provisional so it's identifiable on its own, not just inferred from a dashed line. It isn't limited to today specifically. Browse back a day and it can still fill in a trailing period or two that the official pipeline hadn't caught up on yet, but in practice you'll rarely see it anywhere except today and, occasionally, the tail end of yesterday.",
       },
       {
         term: "How to tell it apart",
-        body: "A dashed, dimmer segment on the Ring, a dashed line on the chart, and a “provisional” note wherever a price appears — never blended into a confirmed figure without that marking. A count next to the Ring's date picker (for example “46 official · 2 provisional”) shows exactly how much of the day you're viewing is confirmed versus not, rather than just whether each source has anything at all.",
+        body: "A dashed, dimmer segment on the Ring, a dashed line on the chart and a “provisional” note wherever a price appears: never blended into a confirmed figure without that marking. A count next to the Ring's date picker (for example “46 official · 2 provisional”) shows exactly how much of the day you're viewing is confirmed versus not, rather than just whether each source has anything at all.",
       },
     ],
   },
@@ -153,23 +153,23 @@ const SECTIONS = [
       },
       {
         term: "Provisional data toggle",
-        body: "Switch on to fill in today's not-yet-official prices where the confirmed figure hasn't landed yet — off by default. See “Provisional prices” above for what that means and how it's marked.",
+        body: "Switch on to fill in today's not-yet-official prices where the confirmed figure hasn't landed yet, off by default. See “Provisional prices” above for what that means and how it's marked.",
       },
       {
         term: "Chart and Table view",
-        body: "The price history section below the Ring can show the same data as a chart or as a sortable table — switch between them with the Chart/Table buttons.",
+        body: "The price history section below the Ring can show the same data as a chart or as a sortable table. Switch between them with the Chart/Table buttons.",
       },
       {
         term: "Intraday / Tomorrow / Both",
-        body: "Chart-only, and only available while viewing Today: Intraday shows today's actual prices, Tomorrow shows tomorrow's day-ahead price on its own, and Both overlays the two so they can be compared hour by hour. Outside Today, only Intraday applies, since Tomorrow and Both are both about comparing against tomorrow's date specifically.",
+        body: "Chart-only, and only available while viewing Today: Intraday shows today's actual prices, Tomorrow shows tomorrow's day-ahead price on its own and Both overlays the two so they can be compared hour by hour. Outside Today, only Intraday applies, since Tomorrow and Both are both about comparing against tomorrow's date specifically.",
       },
       {
         term: "Custom date range",
-        body: "Pick Custom instead of Today, 7 day, or All time to set your own start and end date.",
+        body: "Pick Custom instead of Today, 7 day or All time to set your own start and end date.",
       },
       {
         term: "Exporting to Excel",
-        body: "The Export .xlsx button downloads whatever's currently shown in the table — every auction's row for the active date range — regardless of which chart series is selected.",
+        body: "The Export .xlsx button downloads whatever's currently shown in the table (every auction's row for the active date range), regardless of which chart series is selected.",
       },
     ],
   },
@@ -236,7 +236,7 @@ export default function HelpPage() {
       <section className="glossary-section">
         <h2 id="how-to-use-it">How to use it</h2>
         <p className="glossary-body">
-          Today&rsquo;s Ring shows the live price at a glance, coloured low, typical,
+          Today&rsquo;s Ring shows the live price at a glance, coloured low, typical
           or peak against the last 7 days. For a fuller picture, the price
           history chart&rsquo;s &ldquo;Both&rdquo; view overlays today&rsquo;s actual intraday
           price against tomorrow&rsquo;s already-set day ahead price on the same
@@ -316,7 +316,7 @@ export default function HelpPage() {
           This site shows real auction results from SEMOpx, not an estimate or a
           forecast built by AI. That said, prices are pulled and converted
           automatically, so treat the figures as informational. Don&rsquo;t use this
-          site as the sole basis for switching tariff, timing large energy use, or
+          site as the sole basis for switching tariff, timing large energy use or
           any financial decision, always check a live supplier tariff or SEMOpx&rsquo;s
           own published data if a decision depends on it.
         </p>
