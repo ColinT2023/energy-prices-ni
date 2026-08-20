@@ -4,6 +4,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDataCoverage } from "../hooks/useDataCoverage";
 import {
   aggregateDaily,
+  aggregateHourly,
   dayAheadSeries,
   latestIntradaySeries,
   WIDE_RANGE_DAYS,
@@ -419,8 +420,11 @@ function tooltipTextForBoth(point) {
   }
   if (point.intraday != null) {
     const label = (point.intradayAuction && AUCTION_LABEL[point.intradayAuction]) || "intraday";
+    // " avg" unconditionally, not gated on anything — Both's intraday
+    // line is always the hourly-averaged series now (see aggregateHourly),
+    // never a genuine single-period value the way it is elsewhere.
     parts.push(
-      `today (${label}) ${formatPence(point.intradayGbp)}p/kWh · £${formatGbp(point.intradayGbp)}/MWh${point.intradayProvisional ? " (provisional)" : ""}`
+      `today (${label}) ${formatPence(point.intradayGbp)}p/kWh · £${formatGbp(point.intradayGbp)}/MWh avg${point.intradayProvisional ? " (provisional)" : ""}`
     );
   }
   return parts.join(" · ");
@@ -492,7 +496,13 @@ export default function PriceHistoryChart({
   }, [isBoth, tomorrowRows, plotRows, showDayAhead, isAggregated]);
   const intradayPoints = useMemo(() => {
     if (!showIntraday) return [];
-    if (isBoth) return toTimeOfDayPoints(latestIntradaySeries(rows));
+    // Both thins today's intraday to hourly averages (~24 points instead
+    // of ~48) — see aggregateHourly's own doc comment for why. Day ahead
+    // stays full half-hourly resolution: it's a single flat-coloured
+    // line (no gradient), so its own density never produced the
+    // "solid mass" problem this thinning fixes, only intraday's per-
+    // point gradient did.
+    if (isBoth) return toTimeOfDayPoints(aggregateHourly(latestIntradaySeries(rows)));
     const series = latestIntradaySeries(plotRows);
     return toPoints(isAggregated ? aggregateDaily(series) : series);
   }, [isBoth, rows, plotRows, showIntraday, isAggregated]);
@@ -593,6 +603,14 @@ export default function PriceHistoryChart({
         <p className="placeholder-note">{plotEmptyMessage}</p>
       ) : (
         <>
+        <div className="chart-plot-row">
+        <div className="chart-y-labels">
+          {GRIDLINE_FRACTIONS.map((f) => (
+            <span key={f} className="chart-y-label" style={{ top: `${f * 100}%` }}>
+              {priceAtGridline(scales, f).toFixed(1)}p
+            </span>
+          ))}
+        </div>
         <div className="chart-plot">
           <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} width="100%" height="200" preserveAspectRatio="none">
             <defs>
@@ -618,22 +636,15 @@ export default function PriceHistoryChart({
                   strokeWidth="1"
                 />
               ))}
-            {dayAheadPoints.length > 1 &&
-              (dayAheadPoints.some((p) => p.provisional) ? (
-                toPathSegments(dayAheadPoints, scales).map((seg) => (
-                  <path
-                    key={seg.key}
-                    d={seg.d}
-                    fill="none"
-                    stroke="var(--text)"
-                    strokeWidth="2"
-                    strokeDasharray={seg.dashed ? "5 3" : undefined}
-                    pointerEvents="none"
-                  />
-                ))
-              ) : (
-                <path d={toPath(dayAheadPoints, scales)} fill="none" stroke="var(--text)" strokeWidth="2" pointerEvents="none" />
-              ))}
+            {/* Intraday drawn before day ahead (not after) so day ahead
+                paints on top — Both mode overlays both lines on the same
+                time-of-day axis, and a thinner line drawn under a thicker
+                one gets visually cut off wherever they cross or run
+                close together. Day ahead is the sparser, single-colour
+                line; giving it both the top z-order and the heavier
+                stroke (3 vs intraday's 2, down from the previous 2.5)
+                is what actually keeps it legible against intraday's
+                colourful gradient rather than just one of the two. */}
             {intradayPoints.length > 1 &&
               (intradayPoints.some((p) => p.provisional) ? (
                 toPathSegments(intradayPoints, scales).map((seg) => (
@@ -642,7 +653,7 @@ export default function PriceHistoryChart({
                     d={seg.d}
                     fill="none"
                     stroke="url(#intradayGradient)"
-                    strokeWidth="2.5"
+                    strokeWidth={isBoth ? "2" : "2.5"}
                     strokeDasharray={seg.dashed ? "5 3" : undefined}
                     pointerEvents="none"
                   />
@@ -652,7 +663,29 @@ export default function PriceHistoryChart({
                   d={toPath(intradayPoints, scales)}
                   fill="none"
                   stroke="url(#intradayGradient)"
-                  strokeWidth="2.5"
+                  strokeWidth={isBoth ? "2" : "2.5"}
+                  pointerEvents="none"
+                />
+              ))}
+            {dayAheadPoints.length > 1 &&
+              (dayAheadPoints.some((p) => p.provisional) ? (
+                toPathSegments(dayAheadPoints, scales).map((seg) => (
+                  <path
+                    key={seg.key}
+                    d={seg.d}
+                    fill="none"
+                    stroke="var(--text)"
+                    strokeWidth={isBoth ? "3" : "2"}
+                    strokeDasharray={seg.dashed ? "5 3" : undefined}
+                    pointerEvents="none"
+                  />
+                ))
+              ) : (
+                <path
+                  d={toPath(dayAheadPoints, scales)}
+                  fill="none"
+                  stroke="var(--text)"
+                  strokeWidth={isBoth ? "3" : "2"}
                   pointerEvents="none"
                 />
               ))}
@@ -684,14 +717,6 @@ export default function PriceHistoryChart({
               />
             ))}
           </svg>
-
-          <div className="chart-y-labels">
-            {GRIDLINE_FRACTIONS.map((f) => (
-              <span key={f} className="chart-y-label" style={{ top: `${f * 100}%` }}>
-                {priceAtGridline(scales, f).toFixed(1)}p
-              </span>
-            ))}
-          </div>
 
           {activePoint && (
             <div
@@ -734,12 +759,13 @@ export default function PriceHistoryChart({
                   {isBoth ? "Today · " : ""}
                   {intradayDisplayLabel(activePoint.intradayAuction)} · {formatPence(activePoint.intradayGbp)}p/kWh · £
                   {formatGbp(activePoint.intradayGbp)}/MWh
-                  {isAggregated ? " avg" : ""}
+                  {isAggregated || isBoth ? " avg" : ""}
                   {activePoint.intradayProvisional ? " · provisional" : ""}
                 </div>
               )}
             </div>
           )}
+        </div>
         </div>
 
         <div className="chart-x-labels">
@@ -787,6 +813,11 @@ export default function PriceHistoryChart({
           <span className="chart-aggregation-note">
             Showing daily averages — select Today or 7 day for half-hourly detail.
             {coverageText ? ` ${coverageText}` : ""}
+          </span>
+        )}
+        {isBoth && (
+          <span className="chart-aggregation-note">
+            Today&rsquo;s intraday shown as hourly averages here — select Intraday for half-hourly detail.
           </span>
         )}
         {hasProvisional && <span className="chart-provisional-note">Dashed = provisional, not yet official.</span>}

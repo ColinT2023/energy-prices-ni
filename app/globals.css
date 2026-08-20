@@ -456,8 +456,19 @@ h1 {
   background: var(--bg-raised);
 }
 
+/* .chart-y-labels used to be absolutely positioned over this same box
+   (inset: 0), which put its labels directly on top of the plotted line
+   at x=0 instead of clear of it. Now a flex row: .chart-y-labels is a
+   reserved gutter to the left, .chart-plot only ever contains the SVG
+   itself (plus the tooltip, still positioned relative to it). */
+.chart-plot-row {
+  display: flex;
+}
+
 .chart-plot {
   position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .chart-plot svg rect {
@@ -484,31 +495,41 @@ h1 {
   outline: none;
 }
 
+/* Fixed-width gutter, own column (see .chart-plot-row above) — not an
+   absolutely-positioned overlay on the plot anymore, so a label can't
+   sit on top of the plotted line. 44px comfortably fits this site's
+   real price labels ("16.0p" through a defensive 6-character
+   "199.5p") at this font/size without needing per-value measurement. */
 .chart-y-labels {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  flex: 0 0 44px;
   pointer-events: none;
 }
 
 .chart-y-label {
   position: absolute;
   left: 0;
+  right: 4px;
+  text-align: right;
   transform: translateY(-50%);
-  background: var(--bg-raised);
-  padding: 0 6px 0 0;
   font-family: var(--font-mono), monospace;
   font-size: 10px;
   color: var(--text-muted);
 }
 
-/* Below .chart-plot, not overlaid on it — a fixed-height row of labels
-   positioned by the same left% the SVG's own x-scale uses (both are
-   100%-width, so a tick's viewBox x-position and its label's CSS left%
-   line up without needing to duplicate the scale in two unit systems). */
+/* Below .chart-plot-row, not overlaid on it — a fixed-height row of
+   labels positioned by the same left% the SVG's own x-scale uses (both
+   are 100%-width, so a tick's viewBox x-position and its label's CSS
+   left% line up without needing to duplicate the scale in two unit
+   systems). margin-left matches .chart-y-labels' own gutter width above
+   so these ticks still align under .chart-plot's actual x=0/100%, not
+   the wider row's — otherwise every tick would land 44px right of where
+   its corresponding point in the plot actually is. */
 .chart-x-labels {
   position: relative;
   height: 16px;
   margin-top: 6px;
+  margin-left: 44px;
 }
 
 .chart-x-label {
