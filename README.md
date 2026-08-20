@@ -107,6 +107,38 @@ increasingly longer, spanning multiple auction types instead of just
 SEM-DA, or not resolving at all (worth actually addressing, unlike the
 baseline case this note describes).
 
+### Provisional ingestion's real trigger: a Cloudflare Worker, not GitHub's schedule
+
+`ingest-provisional.yml` has no `schedule:` trigger — only `workflow_dispatch:`.
+This is deliberate: measured directly this session, GitHub's own scheduler was
+dropping roughly half (later measured closer to 80% once both ingestion
+workflows were compared side by side) of this workflow's `*/15`-interval
+triggers under load — a documented GitHub Actions limitation ("if the load is
+sufficiently high enough, some queued jobs may be dropped"), not something a
+tighter cron interval or a workflow-file change can fix from the inside.
+
+Instead, a small Cloudflare Worker (`cloudflare/provisional-cron/`) runs on
+its own Cron Trigger every 5 minutes and calls this workflow's
+`workflow_dispatch` API directly — an endpoint that isn't subject to GitHub's
+schedule-trigger queue, so it sidesteps the drop rather than trying to
+outguess it. See `cloudflare/provisional-cron/wrangler.toml` for why 5
+minutes specifically, and `cloudflare/provisional-cron/src/index.js` for the
+dispatch call itself.
+
+This depends on two things that live outside this repo and aren't part of
+its own setup:
+
+- A **Cloudflare account** hosting the Worker, with `GITHUB_DISPATCH_TOKEN`
+  set as an encrypted Worker secret (`wrangler secret put
+  GITHUB_DISPATCH_TOKEN`) — never committed, never in `wrangler.toml`.
+- A **GitHub personal access token** (fine-grained, or classic with the
+  `workflow` scope) with permission to dispatch workflows on this repo, used
+  as that secret's value.
+
+The official "Ingest NI prices" workflow (`ingest.yml`) is untouched — it
+still uses GitHub's own `schedule:` trigger, and this Worker only ever calls
+the provisional one.
+
 ## Deploying
 
 Hosted on Vercel. Connect this repo, then set the same two frontend env

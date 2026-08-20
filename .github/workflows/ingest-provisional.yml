@@ -1,32 +1,18 @@
 name: Ingest NI provisional prices
 
 on:
-  # Matches the main pipeline's interval, not tighter. This repo is
-  # public (confirmed directly via the GitHub API), and public repos get
-  # unlimited free Actions minutes on standard hosted runners — so
-  # billing was never actually the deciding factor here, despite this
-  # comment previously assuming otherwise. The real bottleneck, measured
-  # directly: GitHub's own scheduler already drops roughly half of this
-  # workflow's */15 triggers under load, so tightening further (e.g.
-  # */5) would mostly generate more dropped attempts rather than a
-  # proportionally faster real cadence, while adding load against the
-  # undocumented endpoint below for limited real gain. The coverage-skip
-  # check (today_fully_covered, see ingest_provisional.py) stays
-  # regardless of interval either way — it's still doing real work
-  # protecting that endpoint from unnecessary hits and keeping actual
-  # poll work minimal whenever a run isn't skipped.
-  #
-  # Offset 5 minutes from ingest.yml's "*/15 * * * *" (0/15/30/45),
-  # deliberately, not the same slots — measured directly, both workflows
-  # were firing within a minute or two of each other on the same
-  # schedule, and both showing an ~80% dropped/delayed trigger rate.
-  # Doesn't require knowing whether that's account-wide concurrency,
-  # repo-level load, or something else specific to landing at the exact
-  # same instant — staggering removes that overlap regardless of which
-  # it is. Re-measure the actual drop rate after a few hours of real
-  # runs before concluding whether this helped.
-  schedule:
-    - cron: "5,20,35,50 * * * *"
+  # No `schedule:` trigger here anymore — GitHub's own scheduler was
+  # measured directly (this session) dropping ~50-80% of this workflow's
+  # */15 triggers under load, a documented GitHub Actions limitation, not
+  # something fixable from inside this file. Replaced with an external
+  # Cloudflare Worker Cron Trigger (cloudflare/provisional-cron/) that
+  # calls workflow_dispatch below every 5 minutes instead — that API
+  # isn't subject to the same scheduler queue, so it sidesteps the drop
+  # rather than trying to outguess it with a tighter cron interval. See
+  # the main README's "Provisional ingestion's real trigger" section and
+  # cloudflare/provisional-cron/wrangler.toml for the full reasoning and
+  # setup. workflow_dispatch stays here regardless, both as what the
+  # Worker calls and so this can still be triggered manually if needed.
   workflow_dispatch: {}
 
 jobs:

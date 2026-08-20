@@ -1,0 +1,35 @@
+name = "ni-provisional-cron"
+main = "src/index.js"
+compatibility_date = "2026-08-20"
+
+# Every 5 minutes, not GitHub's old "*/15 * * * *" (offset to 5,20,35,50).
+# The 15-minute interval existed to be gentle on GitHub's own scheduler,
+# which is exactly the thing this Worker replaces — workflow_dispatch
+# (what this actually calls) isn't subject to the schedule-trigger queue
+# that was dropping ~50-80% of triggers, so there's no equivalent reason
+# to stay conservative here. 5 minutes chosen because:
+#   - The workflow's own nothing_left_to_poll() check (see
+#     scripts/provisional_common.py) makes a firing with genuinely
+#     nothing new to do a cheap early-exit, not a wasted full run — so a
+#     tighter interval mostly costs a few extra no-op Actions minutes,
+#     not real ingestion load against the undocumented endpoint.
+#   - Cloudflare Workers' free tier cron trigger limit is generous enough
+#     that 5-minute firings (288/day) aren't a practical constraint.
+#   - Tighter than 5 minutes stops buying much: the underlying data
+#     source (SEMOpx's undocumented IST=1 feed) doesn't update faster
+#     than every few minutes in practice, so going below ~5 just adds
+#     firings without a meaningfully fresher result.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# GITHUB_DISPATCH_TOKEN is deliberately not set here — this file is
+# committed to git. Set it as an encrypted secret instead, after
+# installing wrangler and authenticating (`wrangler login`):
+#
+#   wrangler secret put GITHUB_DISPATCH_TOKEN
+#
+# then paste the token when prompted. It needs a fine-grained GitHub PAT
+# (or classic PAT with the `workflow` scope) with permission to trigger
+# workflow_dispatch on ColinT2023/energy-prices-ni — see the main
+# README's "Provisional ingestion's real trigger" section for the full
+# setup path (Cloudflare account + PAT both live outside this repo).
