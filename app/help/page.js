@@ -195,7 +195,7 @@ export default function HelpPage() {
         <h2 id="purpose">Purpose of this dashboard</h2>
         <p className="glossary-body">
           This dashboard tracks Northern Ireland&rsquo;s wholesale electricity price
-          throughout the day, and compares day ahead and intraday prices to help
+          throughout the day and compares day ahead and intraday prices to help
           identify cheaper periods. It&rsquo;s price data only, not a measure of demand
           or consumption, there are no figures here for how much electricity is
           actually being used or generated at any given time. Whether you&rsquo;re a
