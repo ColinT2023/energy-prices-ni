@@ -211,9 +211,9 @@ export default function HelpPage() {
         <p className="glossary-body">
           The prices shown are sourced from SEMOpx, the official operator of the
           day ahead and intraday electricity auctions for the Single Electricity
-          Market covering Ireland and Northern Ireland. SEMOpx is jointly
-          regulated by the Utility Regulator (Northern Ireland) and the CRU
-          (Republic of Ireland), meaning this data is not a third party
+          Market covering Northern Ireland and the Republic of Ireland. SEMOpx
+          is jointly regulated by the Utility Regulator (Northern Ireland) and
+          the CRU (Republic of Ireland), meaning this data is not a third party
           estimate but the actual settlement data the wholesale market runs
           on. It can be considered the single source of truth for wholesale
           electricity pricing in this market.
