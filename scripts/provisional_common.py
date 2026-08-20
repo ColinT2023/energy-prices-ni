@@ -57,6 +57,28 @@ def london_today_bounds(now_utc=None):
 # further back into history.
 TRAILING_PERIODS_FROM_YESTERDAY = 4
 
+# The London wall-clock hour after which "today" is safe to treat as
+# genuinely covered by mere presence-of-any-auction, rather than requiring
+# a real report-list check every run. Set past SEM-IDA3's own window close
+# (17:00-22:30 London, confirmed invariant across 231 real historical days
+# this session — zero exceptions) with 30 minutes of margin, not right at
+# the edge, in case a specific day's report is a little late.
+#
+# Why this exists: the coverage check below only asks "does *any* auction's
+# row exist for this period," not "does the *latest available* auction's
+# row exist" — so once SEM-DA/IDA1/IDA2 alone happen to fill every period
+# of today (very plausible on their own: IDA1 alone typically covers
+# 44-48 of the day's 48 periods), nothing_left_to_poll() would return True
+# and ingest_provisional.py would stop checking the report list for the
+# rest of the day, silently missing SEM-IDA3 even once it publishes and is
+# genuinely fetchable. Confirmed as a real, live case on 20 Aug 2026:
+# SEM-IDA3 published 13:15 UTC, but provisional had already reached 48/48
+# any-auction coverage for today, and no run touched the report list again
+# until this fix. A single named constant, not inlined, since this depends
+# on SEMOpx's real schedule staying consistent with what's been verified —
+# adjust this one place if that ever changes.
+TODAY_COVERAGE_SHORTCUT_HOUR_LONDON = 23
+
 
 def _periods_covered(supabase, start_utc, end_utc):
     """Count of distinct settlement periods with at least one row, across
@@ -89,18 +111,30 @@ def nothing_left_to_poll(supabase):
     Doesn't matter which auction or which table a period's row came from,
     only that one exists — filling gaps is this job's entire purpose,
     keeping an already-covered period's value fresher against a later
-    auction revision is not something it tries to do.
+    auction revision is not something it tries to do... with one
+    exception: today specifically isn't considered coverable at all until
+    TODAY_COVERAGE_SHORTCUT_HOUR_LONDON, since "any auction present" can't
+    be trusted as "the latest auction present" while SEM-IDA3 could still
+    publish (see that constant's own comment for why, and the real case
+    that motivated it).
 
-    Four small `select datetime` queries — this exists specifically so a
-    run can decide "nothing to do" without ever touching the report list
-    or the IST=1 endpoint, so it stays cheap regardless of how tight the
-    schedule interval is. (The report-fetching in ingest_provisional.py
-    itself needs no matching change: it's driven by the official
-    pipeline's watermark, not by date, so it already picks up yesterday's
-    trailing-period reports whenever it does run — confirmed directly,
-    that's exactly how Aug 12's trailing periods ended up provisionally
-    covered already.)
+    Before the cutoff: always False, no query needed at all — the answer
+    is already known without asking the database, which is strictly
+    cheaper than the four small `select datetime` queries this used to
+    always run. After the cutoff: same two `_periods_covered` checks as
+    before, unchanged — this exists so a run can decide "nothing to do"
+    without ever touching the report list or the IST=1 endpoint, so it
+    stays cheap regardless of how tight the schedule interval is. (The
+    report-fetching in ingest_provisional.py itself needs no matching
+    change: it's driven by the official pipeline's watermark, not by
+    date, so it already picks up yesterday's trailing-period reports
+    whenever it does run — confirmed directly, that's exactly how Aug
+    12's trailing periods ended up provisionally covered already.)
     """
+    now_london = datetime.now(timezone.utc).astimezone(LONDON_TZ)
+    if now_london.hour < TODAY_COVERAGE_SHORTCUT_HOUR_LONDON:
+        return False
+
     today_start, today_end, today_periods = london_today_bounds()
     yesterday_trailing_start = today_start - timedelta(minutes=30 * TRAILING_PERIODS_FROM_YESTERDAY)
 
