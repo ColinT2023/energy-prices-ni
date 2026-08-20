@@ -175,24 +175,64 @@ export default function HelpPage() {
       <p className="eyebrow">NI Electricity · SEM Auctions</p>
       <h1>Help &amp; glossary</h1>
 
-      <p className="glossary-intro">
-        This shows how Northern Ireland&rsquo;s electricity price changes throughout
-        the day &mdash; it isn&rsquo;t a bill calculator and doesn&rsquo;t show how much
-        electricity anyone&rsquo;s using, just what electricity itself costs on the
-        wholesale market at any given moment.
-      </p>
+      <section className="glossary-section">
+        <h2>Purpose of this dashboard</h2>
+        <p className="glossary-body">
+          This dashboard tracks Northern Ireland&rsquo;s wholesale electricity price
+          throughout the day, and compares day ahead and intraday prices to help
+          identify cheaper periods. It&rsquo;s price data only, not a measure of demand
+          or consumption, there are no figures here for how much electricity is
+          actually being used or generated at any given time. Whether you&rsquo;re a
+          household deciding when to run the washing machine or a business
+          managing flexible energy use, non essential activity can be shifted
+          towards lower price windows to reduce costs, while anything time
+          sensitive can simply continue as normal regardless of price.
+        </p>
+      </section>
 
-      <p className="glossary-lede">
-        Northern Ireland and the Republic of Ireland share a single electricity
-        market called the SEM. Generators and suppliers trade power through daily
-        auctions, and the price set by each auction is what this site shows. This
-        is price data only, not a measure of demand or consumption &mdash; there are
-        no figures anywhere on this site for how much electricity is actually
-        being used or generated at any given time. There is no single &ldquo;the
-        price of electricity&rdquo; the way there&rsquo;s a petrol price on a petrol
-        station sign, there&rsquo;s a different price for every half hour of the day, set the
-        day before and then revised as the actual day gets closer.
-      </p>
+      <section className="glossary-section">
+        <h2>Where the data comes from</h2>
+        <p className="glossary-body">
+          The prices shown are sourced from SEMOpx, the official operator of the
+          day ahead and intraday electricity auctions for the Single Electricity
+          Market covering Ireland and Northern Ireland. SEMOpx is jointly
+          regulated by the Utility Regulator (Northern Ireland) and the CRU
+          (Republic of Ireland), meaning this data is not a third party
+          estimate but the actual settlement data the wholesale market runs
+          on. It can be considered the single source of truth for wholesale
+          electricity pricing in this market.
+        </p>
+      </section>
+
+      <section className="glossary-section">
+        <h2>Why this matters compared to a supplier bill</h2>
+        <p className="glossary-body">
+          Electricity suppliers, including the major retail providers, ultimately
+          trade through this same wholesale market before applying their own
+          markup and passing costs on to customers, whether you&rsquo;re on a
+          household tariff or a business contract. A standard supplier bill
+          doesn&rsquo;t expose this underlying wholesale price or its half hourly
+          movement. This dashboard makes that normally hidden pricing visible,
+          giving anyone insight the retail relationship alone doesn&rsquo;t provide.
+        </p>
+      </section>
+
+      <section className="glossary-section">
+        <h2>How to use it</h2>
+        <p className="glossary-body">
+          Today&rsquo;s Ring shows the live price at a glance, coloured low, typical,
+          or peak against the last 7 days. For a fuller picture, the price
+          history chart&rsquo;s &ldquo;Both&rdquo; view overlays today&rsquo;s actual intraday
+          price against tomorrow&rsquo;s already-set day ahead price on the same
+          time-of-day axis, a preview of whether tomorrow looks cheaper or more
+          expensive than today&rsquo;s pattern. Where a period&rsquo;s price runs lower,
+          that&rsquo;s a potentially good window for anything flexible, a business
+          process or just a household appliance. Anything time sensitive should
+          continue to run as needed regardless of price, this tool is intended
+          for spotting savings opportunities in the flexible portion of energy
+          use, not for managing anything critical.
+        </p>
+      </section>
 
       {SECTIONS.map((section) => (
         <section key={section.heading} className="glossary-section">

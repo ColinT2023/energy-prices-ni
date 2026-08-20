@@ -957,26 +957,6 @@ h1 {
   background: var(--text);
 }
 
-/* One-line plain-English orientation above .glossary-lede's fuller market
-   mechanics — brighter than the muted lede text since this is the single
-   sentence someone unfamiliar with the site should read first. */
-.glossary-intro {
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 500;
-  line-height: 1.6;
-  max-width: 68ch;
-  margin: 0 0 16px;
-}
-
-.glossary-lede {
-  color: var(--text-muted);
-  font-size: 15px;
-  line-height: 1.7;
-  max-width: 68ch;
-  margin: 0 0 40px;
-}
-
 .glossary-section {
   margin-top: 40px;
   padding-top: 32px;
