@@ -406,6 +406,15 @@ function tooltipText(point, isAggregated) {
   return parts.join(" · ");
 }
 
+/** Same fact as the chart's own caption ("Today's intraday shown as
+ * hourly averages here — select Intraday for half-hourly detail."),
+ * reworded for the one place it's actually needed: a half-hour slot
+ * that landed on the "off" side of aggregateHourly's on-the-hour-only
+ * points, so Both's intraday line genuinely has nothing at this exact
+ * position — not a bug, just the caption's fact made visible right
+ * where someone would otherwise see intraday silently missing. */
+const BOTH_NO_INTRADAY_NOTE = "No intraday point at this half hour. Today's intraday is shown as hourly averages in this view.";
+
 /** Tooltip text for the Both series specifically — both values are
  * explicitly dated ("today"/"tomorrow") rather than just naming the
  * auction type, since the whole point of this mode is overlaying two
@@ -426,6 +435,8 @@ function tooltipTextForBoth(point) {
     parts.push(
       `today (${label}) ${formatPence(point.intradayGbp)}p/kWh · £${formatGbp(point.intradayGbp)}/MWh avg${point.intradayProvisional ? " (provisional)" : ""}`
     );
+  } else {
+    parts.push(BOTH_NO_INTRADAY_NOTE);
   }
   return parts.join(" · ");
 }
@@ -763,6 +774,7 @@ export default function PriceHistoryChart({
                   {activePoint.intradayProvisional ? " · provisional" : ""}
                 </div>
               )}
+              {isBoth && activePoint.intraday == null && <div className="chart-tooltip-note">{BOTH_NO_INTRADAY_NOTE}</div>}
             </div>
           )}
         </div>

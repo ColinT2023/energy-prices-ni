@@ -605,6 +605,21 @@ h1 {
   margin-right: 6px;
 }
 
+/* Only appears in Both mode, on the half-hour slots aggregateHourly
+   doesn't produce an intraday point for — a full sentence, not a price
+   line, so it needs its own wrap width rather than inheriting
+   .chart-tooltip's nowrap (fine for a single "label value/MWh" line,
+   not for this). Same muted italic treatment as .chart-aggregation-note
+   and .chart-provisional-note below — the site's one existing language
+   for an auxiliary note, not a new one. */
+.chart-tooltip-note {
+  margin-top: 4px;
+  max-width: 220px;
+  white-space: normal;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* The Both series' tooltip carries two full value rows ("Tomorrow (day
    ahead) 12.21p..." / "Today · Intraday 2 · 12.24p...") — wide enough on
    its own to overflow the chart's own plot area on a narrow viewport
