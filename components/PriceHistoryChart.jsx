@@ -4,7 +4,6 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDataCoverage } from "../hooks/useDataCoverage";
 import {
   aggregateDaily,
-  aggregateHourly,
   dayAheadSeries,
   latestIntradaySeries,
   WIDE_RANGE_DAYS,
@@ -276,25 +275,39 @@ function toPath(points, scales) {
     .join(" ");
 }
 
-/** Same line as toPath, but as one small path per consecutive point pair
- * instead of one continuous path — only used when the series actually has
- * provisional points, so each segment touching one can be drawn dashed
- * without needing SVG's dasharray to somehow vary partway along a single
- * path. Segments where neither endpoint is provisional look identical to
- * the single-path version; this is strictly more expensive to render, so
- * toPath is still used whenever nothing needs the per-segment styling. */
-function toPathSegments(points, scales) {
-  const segments = [];
+/** Same line as toPath, but split into separate <path> elements only
+ * where the dashed/solid state actually changes — not one fragment per
+ * point pair. A point pair is "dashed" if either endpoint is
+ * provisional, same rule as before; consecutive pairs sharing that same
+ * state get concatenated ("L" continuations) into one running path
+ * instead of starting a fresh one, so SVG's own dasharray phase runs
+ * continuously across however many points share that state rather than
+ * restarting at every individual point-to-point fragment. That restart
+ * was the actual cause of dashes looking uneven/broken once points were
+ * dense enough to sit close together (confirmed directly: a run of N
+ * adjacent dashed pairs used to render as N independently-phased 2-point
+ * dash patterns, not one continuous dashed line) — this is the fix, not
+ * a cosmetic tweak. Runs where neither endpoint is provisional stay
+ * solid and get grouped the same way, for the same reason. */
+function toPathRuns(points, scales) {
+  const runs = [];
+  let current = null;
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1];
     const b = points[i];
-    segments.push({
-      key: `${a.t}`,
-      d: `M${scales.x(a.t).toFixed(1)},${scales.y(a.price).toFixed(1)} L${scales.x(b.t).toFixed(1)},${scales.y(b.price).toFixed(1)}`,
-      dashed: a.provisional || b.provisional,
-    });
+    const dashed = a.provisional || b.provisional;
+    const bx = scales.x(b.t).toFixed(1);
+    const by = scales.y(b.price).toFixed(1);
+    if (current && current.dashed === dashed) {
+      current.d += ` L${bx},${by}`;
+    } else {
+      const ax = scales.x(a.t).toFixed(1);
+      const ay = scales.y(a.price).toFixed(1);
+      current = { key: `${a.t}`, dashed, d: `M${ax},${ay} L${bx},${by}` };
+      runs.push(current);
+    }
   }
-  return segments;
+  return runs;
 }
 
 /** One entry per settlement period with data on either line, so hovering
@@ -406,14 +419,15 @@ function tooltipText(point, isAggregated) {
   return parts.join(" · ");
 }
 
-/** Same fact as the chart's own caption ("Today's intraday shown as
- * hourly averages here — select Intraday for half-hourly detail."),
- * reworded for the one place it's actually needed: a half-hour slot
- * that landed on the "off" side of aggregateHourly's on-the-hour-only
- * points, so Both's intraday line genuinely has nothing at this exact
- * position — not a bug, just the caption's fact made visible right
- * where someone would otherwise see intraday silently missing. */
-const BOTH_NO_INTRADAY_NOTE = "No intraday point at this half hour. Today's intraday is shown as hourly averages in this view.";
+/** Both overlays two independent series for two different calendar
+ * days — today's real settlement periods and tomorrow's day-ahead
+ * curve — so they don't always both have a point at the same time-of-
+ * day position. Most commonly: tomorrow's day ahead already covers the
+ * full 24 hours (published as one batch), while today's own intraday
+ * data only exists up to whatever's actually happened so far. Same
+ * "no data" wording already used elsewhere on this site (e.g. the
+ * Ring's own segment tooltips) rather than inventing new phrasing. */
+const BOTH_NO_INTRADAY_NOTE = "No intraday data for this half hour yet.";
 
 /** Tooltip text for the Both series specifically — both values are
  * explicitly dated ("today"/"tomorrow") rather than just naming the
@@ -429,11 +443,8 @@ function tooltipTextForBoth(point) {
   }
   if (point.intraday != null) {
     const label = (point.intradayAuction && AUCTION_LABEL[point.intradayAuction]) || "intraday";
-    // " avg" unconditionally, not gated on anything — Both's intraday
-    // line is always the hourly-averaged series now (see aggregateHourly),
-    // never a genuine single-period value the way it is elsewhere.
     parts.push(
-      `today (${label}) ${formatPence(point.intradayGbp)}p/kWh · £${formatGbp(point.intradayGbp)}/MWh avg${point.intradayProvisional ? " (provisional)" : ""}`
+      `today (${label}) ${formatPence(point.intradayGbp)}p/kWh · £${formatGbp(point.intradayGbp)}/MWh${point.intradayProvisional ? " (provisional)" : ""}`
     );
   } else {
     parts.push(BOTH_NO_INTRADAY_NOTE);
@@ -507,13 +518,12 @@ export default function PriceHistoryChart({
   }, [isBoth, tomorrowRows, plotRows, showDayAhead, isAggregated]);
   const intradayPoints = useMemo(() => {
     if (!showIntraday) return [];
-    // Both thins today's intraday to hourly averages (~24 points instead
-    // of ~48) — see aggregateHourly's own doc comment for why. Day ahead
-    // stays full half-hourly resolution: it's a single flat-coloured
-    // line (no gradient), so its own density never produced the
-    // "solid mass" problem this thinning fixes, only intraday's per-
-    // point gradient did.
-    if (isBoth) return toTimeOfDayPoints(aggregateHourly(latestIntradaySeries(rows)));
+    // Both used to thin today's intraday to hourly averages here
+    // (aggregateHourly) to fix overplotting — reverted: traceability
+    // against SEMOpx's own real half-hourly figures now matters more
+    // than that readability trade-off. Full half-hourly resolution,
+    // same as every other mode.
+    if (isBoth) return toTimeOfDayPoints(latestIntradaySeries(rows));
     const series = latestIntradaySeries(plotRows);
     return toPoints(isAggregated ? aggregateDaily(series) : series);
   }, [isBoth, rows, plotRows, showIntraday, isAggregated]);
@@ -656,16 +666,25 @@ export default function PriceHistoryChart({
                 stroke (3 vs intraday's 2, down from the previous 2.5)
                 is what actually keeps it legible against intraday's
                 colourful gradient rather than just one of the two. */}
+            {/* Both mode's intraday stroke gets a slightly lower opacity
+                (0.85) than every other mode's — full half-hourly
+                resolution here means a real run of consecutive
+                same-band points reads as a solid flat block at this
+                density; a touch of transparency lets the gridlines and
+                day-ahead line show through it rather than it reading as
+                a hard wall of colour, without changing what any of the
+                colours themselves mean. */}
             {intradayPoints.length > 1 &&
               (intradayPoints.some((p) => p.provisional) ? (
-                toPathSegments(intradayPoints, scales).map((seg) => (
+                toPathRuns(intradayPoints, scales).map((run) => (
                   <path
-                    key={seg.key}
-                    d={seg.d}
+                    key={run.key}
+                    d={run.d}
                     fill="none"
                     stroke="url(#intradayGradient)"
                     strokeWidth={isBoth ? "2" : "2.5"}
-                    strokeDasharray={seg.dashed ? "5 3" : undefined}
+                    strokeOpacity={isBoth ? "0.85" : undefined}
+                    strokeDasharray={run.dashed ? "5 3" : undefined}
                     pointerEvents="none"
                   />
                 ))
@@ -675,19 +694,20 @@ export default function PriceHistoryChart({
                   fill="none"
                   stroke="url(#intradayGradient)"
                   strokeWidth={isBoth ? "2" : "2.5"}
+                  strokeOpacity={isBoth ? "0.85" : undefined}
                   pointerEvents="none"
                 />
               ))}
             {dayAheadPoints.length > 1 &&
               (dayAheadPoints.some((p) => p.provisional) ? (
-                toPathSegments(dayAheadPoints, scales).map((seg) => (
+                toPathRuns(dayAheadPoints, scales).map((run) => (
                   <path
-                    key={seg.key}
-                    d={seg.d}
+                    key={run.key}
+                    d={run.d}
                     fill="none"
                     stroke="var(--text)"
                     strokeWidth={isBoth ? "3" : "2"}
-                    strokeDasharray={seg.dashed ? "5 3" : undefined}
+                    strokeDasharray={run.dashed ? "5 3" : undefined}
                     pointerEvents="none"
                   />
                 ))
@@ -770,7 +790,7 @@ export default function PriceHistoryChart({
                   {isBoth ? "Today · " : ""}
                   {intradayDisplayLabel(activePoint.intradayAuction)} · {formatPence(activePoint.intradayGbp)}p/kWh · £
                   {formatGbp(activePoint.intradayGbp)}/MWh
-                  {isAggregated || isBoth ? " avg" : ""}
+                  {isAggregated ? " avg" : ""}
                   {activePoint.intradayProvisional ? " · provisional" : ""}
                 </div>
               )}
@@ -825,11 +845,6 @@ export default function PriceHistoryChart({
           <span className="chart-aggregation-note">
             Showing daily averages — select Today or 7 day for half-hourly detail.
             {coverageText ? ` ${coverageText}` : ""}
-          </span>
-        )}
-        {isBoth && (
-          <span className="chart-aggregation-note">
-            Today&rsquo;s intraday shown as hourly averages here — select Intraday for half-hourly detail.
           </span>
         )}
         {hasProvisional && <span className="chart-provisional-note">Dashed = provisional, not yet official.</span>}
